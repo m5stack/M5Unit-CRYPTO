@@ -41,6 +41,22 @@ enum class Slot : uint8_t {
     // 7,13,14,15 are reserved
 };
 
+/*!
+  @enum Source
+  @brief Data source
+ */
+enum class Source : uint8_t {
+    TempKey,             //!< TempKey
+    MsgDigestBuffer,     //!< Message digest buffer
+    AlternateKeyBuffer,  //!< Alternate Key Buffer
+    OutputBuffer,        //!< Any  buffer
+};
+/*!
+  @enum Destination
+  @brief Data destination
+ */
+using Destination = Source;
+
 ///@name Zone
 ///@{
 constexpr uint8_t ZONE_CONFIG{0x00};
@@ -66,52 +82,6 @@ enum Error : uint8_t {
 
 ///@name Delay time for send/receive
 ///@{
-#if 0
-// コマンド名	最大実行時間 (ms)	備考
-// Read	2.5	データシートの更新により、最大実行時間が2.0msから2.5msに増加しました。
-// Write	4.0	
-// GenKey	115.0	鍵の生成を行います。
-// Sign	50.0	データに対する署名を生成します。
-// Verify	58.0	署名の検証を行います。
-// ECDH	58.0	楕円曲線Diffie-Hellman鍵共有を実行します。
-// KDF	75.0	鍵派生関数を実行します。
-// Nonce	3.0	
-// MAC	10.0	メッセージ認証コードを生成します。
-// HMAC	23.0	HMACを生成します。
-// SHA	9.0	SHAハッシュを計算します。
-// AES	3.0	AES暗号化/復号化を実行します。
-// SelfTest	200.0	デバイスの自己診断を実行します。
-// Info	2.0	デバイス情報を取得します。
-// Lock	32.0	デバイスの領域をロックします。
-// Random	23.0	ランダムな数値を生成します。
-// DeriveKey	50.0	鍵の派生を行います。
-// Counter	20.0	カウンタの操作を行います。
-// UpdateExtra	8.0	追加情報の更新を行います。
-// PrivWrite	48.0	秘密鍵の書き込みを行います。
-// SecureBoot	500.0	セキュアブートを実行します。
-//     { ATCA_AES,          27},
-//     { ATCA_CHECKMAC,     40},
-//     { ATCA_COUNTER,      25},
-//     { ATCA_DERIVE_KEY,   50},
-//     { ATCA_ECDH,         75},
-//     { ATCA_GENDIG,       25},
-//     { ATCA_GENKEY,       115},
-//     { ATCA_INFO,         5},
-//     { ATCA_KDF,          165},
-//     { ATCA_LOCK,         35},
-//     { ATCA_MAC,          55},
-//     { ATCA_NONCE,        20},
-//     { ATCA_PRIVWRITE,    50},
-//     { ATCA_RANDOM,       23},
-//     { ATCA_READ,         5},
-//     { ATCA_SECUREBOOT,   80},
-//     { ATCA_SELFTEST,     250},
-//     { ATCA_SHA,          36},
-//     { ATCA_SIGN,         115},
-//     { ATCA_UPDATE_EXTRA, 10},
-//     { ATCA_VERIFY,       105},
-//     { ATCA_WRITE,        45}
-#endif
 constexpr uint32_t DELAY_READ{3};
 constexpr uint32_t DELAY_WRITE{4};
 constexpr uint32_t DELAY_INFO{2};
@@ -123,7 +93,7 @@ constexpr uint32_t DELAY_GENKEY{115};
 constexpr uint32_t DELAY_SIGN{70};
 constexpr uint32_t DELAY_SHA{9};
 constexpr uint32_t DELAY_ECDH{58};
-constexpr uint32_t DELAY_VERIFY{58};
+constexpr uint32_t DELAY_VERIFY{105};
 ///@}
 
 ///@name Word address
@@ -169,12 +139,11 @@ constexpr uint8_t RANDOM_MODE_NOT_UPDATE_SEED{0x01};
 constexpr uint8_t NONCE_MODE_RANDOM_UPDATE_SEED{0x00};
 constexpr uint8_t NONCE_MODE_RANDOM_NOT_UPDATE_SEED{0x01};
 constexpr uint8_t NONCE_MODE_PASSTHROUGH{0x03};
-
 constexpr uint8_t NONCE_MODE_INPUT_64{0x20};
 
-constexpr uint8_t NONCE_MODE_TARGET_TEMPKEY{0x00};  //!< Nonce mode: target is TempKey
-constexpr uint8_t NONCE_MODE_TARGET_MSGDIG{0x40};   //!< Nonce mode: target is Message Digest Buffer
-constexpr uint8_t NONCE_MODE_TARGET_ALTKEY{0x80};   //!< Nonce mode: target is Alternate Key Buffer
+constexpr uint8_t NONCE_MODE_TARGET_TEMPKEY{0x00};
+constexpr uint8_t NONCE_MODE_TARGET_DIGEST{0x40};
+constexpr uint8_t NONCE_MODE_TARGET_ALTKEY{0x80};
 
 constexpr uint16_t NONCE_USE_TRNG{0x0000};
 constexpr uint16_t NONCE_USE_TEMPKEY{0x8000};
@@ -195,6 +164,7 @@ constexpr uint8_t SHA_MODE_OUTPUT_BUFFER{0xC0};
 constexpr uint8_t GENKEY_MODE_PUBLIC{0x00};
 constexpr uint8_t GENKEY_MODE_PRIVATE{0x04};
 constexpr uint8_t GENKEY_MODE_DIGEST{0x08};
+constexpr uint8_t GENKEY_MODE_PUBLIC_DIGEST{0x10};
 ///@}
 
 ///@name Sign
@@ -203,6 +173,7 @@ constexpr uint8_t SIGN_MODE_INTERNAL{0x00};
 constexpr uint8_t SIGN_MODE_INVALIDATE{0x01};
 constexpr uint8_t SIGN_MODE_INCLUDE_SN{0x40};
 constexpr uint8_t SIGN_MODE_EXTERNAL{0x80};
+
 constexpr uint8_t SIGN_MODE_TEMPKEY{0x00};
 constexpr uint8_t SIGN_MODE_DIGEST{0x20};
 
@@ -257,6 +228,31 @@ inline uint16_t slot_block_to_param2(const uint8_t slot, const uint8_t offset)
     const uint8_t block       = offset >> 5;         // 0〜2
     const uint8_t word_offset = (offset & 31) >> 2;  // 0〜7
     return (slot << 3) | (block << 8) | word_offset;
+}
+
+/*!
+  @brief encode Base64
+  @param[out] out Output buffer
+  @param olen Output buffer length
+  @param buf Input buffer
+  @param blen Input buffer length
+  @param line_len ==0 No line breaks ! =0: Line break at that number of characters
+  @param urlEncode base64url encoding if true
+  @param padding Enable padding if true
+  @return Encoded length
+ */
+uint32_t encode_base64(char* out, const uint32_t olen, const uint8_t* buf, const uint32_t blen, const uint8_t line_len,
+                       const bool urlEncode, const bool padding);
+
+//! @brief Encode Base64(PEM)
+inline bool encodeBase64(char* out, const uint32_t olen, const uint8_t* buf, const uint32_t blen)
+{
+    return encode_base64(out, olen, buf, blen, 64, false, true);
+}
+//! @brief Encode Base64URL
+inline bool encodeBase64URL(char* out, const uint32_t olen, const uint8_t* buf, const uint32_t blen)
+{
+    return encode_base64(out, olen, buf, blen, 0, true, false);
 }
 
 //! @brief Convert der to pem

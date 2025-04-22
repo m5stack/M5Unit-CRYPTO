@@ -85,6 +85,32 @@ public:
     bool sleep();
     ///@}
 
+    ///@name Counter
+    ///@{
+    /*!
+      @brief Read the counter value
+      @param[out] value Counter value
+      @param target Target counter (0 or 1)
+      @return True if successful
+      @note The maximum value that the counter may have is 2097151 (0x1fffff)
+     */
+    inline bool readCounter(uint32_t& value, const uint8_t target)
+    {
+        return counter(value, target, 0 /*read*/);
+    }
+    /*!
+      @brief Increment counter
+      @param[out] value Counter value (incremented)
+      @param target Target counter (0 or 1)
+      @return True if successful
+      @note The maximum value that the counter may have is 2097151 (0x1fffff)
+     */
+    inline bool incrementCounter(uint32_t& value, const uint8_t target)
+    {
+        return counter(value, target, 1 /* increment */);
+    }
+    ///@}
+
     ///@name Info
     ///@{
     /*!
@@ -121,422 +147,40 @@ public:
     bool readDeviceState(uint16_t& state);
     ///@}
 
-    ///@name Config zone
-    ///@{
-    /*!
-      @brief Read the config zone
-      @param[out] config[128] Output buffer at least 128 bytes
-     */
-    bool readConfigZone(uint8_t config[128]);
-    /*!
-      @brief Read the serial number
-      @param[out] sn[9] Output buffer at least 9 bytes
-      @return True if successful
-     */
-    bool readSerialNumber(uint8_t sn[9]);
-
-    bool readZoneLocked(bool& configLocked, bool& dataLocked);
-    bool readSlotLocked(uint16_t& slotLockedBits);
-    inline bool readSlotConfig(uint16_t& cfg, const atecc608::Slot slot)
-    {
-        constexpr uint8_t SLOT_CONFIG_BASE{20};  // Offset in ConfigZone
-        return read_slot_config_word(cfg, SLOT_CONFIG_BASE, slot);
-    }
-
-    inline bool readKeyConfig(uint16_t& cfg, const atecc608::Slot slot)
-    {
-        constexpr uint8_t KEY_CONFIG_BASE{96};  // Offset in ConfigZone
-        return read_slot_config_word(cfg, KEY_CONFIG_BASE, slot);
-    }
-    ///@}
-
-    ///@name Data zone
-    ///@{
-    bool readDataZone(uint8_t* data, const uint16_t len, const atecc608::Slot slot);
-
-    ///@}
-
-    ///@name OTP zone
-    ///@{
-    bool readOTPZone(uint8_t otp[64]);
-    ///@}
-
-    ///@name Counter
-    ///@{
-    /*!
-      @brief Read the counter value
-      @param[out] value Counter value
-      @param counter Target counter (0 or 1)
-      @return True if successful
-      @note The maximum value that the counter may have is 2097151 (0x1fffff)
-     */
-    inline bool readCounter(uint32_t& value, const uint8_t counter)
-    {
-        return operate_counter(value, counter, 0 /*read*/);
-    }
-    /*!
-      @brief Increment counter
-      @param[out] value Counter value (incremented)
-      @param counter Target counter (0 or 1)
-      @return True if successful
-      @note The maximum value that the counter may have is 2097151 (0x1fffff)
-     */
-    inline bool incrementCounter(uint32_t& value, const uint8_t counter)
-    {
-        return operate_counter(value, counter, 1 /* increment */);
-    }
-    ///@}
-
     ///@name Nonce
     ///@{
     /*!
-      @brief Create nonce by input data with RNG or TempKey(SRAM).
-      @param[out] tempkey Output buffer at least 32 bytes
+      @brief Create nonce by input data with RNG or TempKey.
+      @param dest Output destination
+      @param[out] output Output buffer at least 32 bytes if not nullptr
       @param input Input buffer at least 20 bytes
-      @param useRNG Using TRNG if true, Using TempKey(SRAM) if false
+      @param useRNG Using TRNG if true, Using TempKey if false
       @param updateSeed Update seed if true
       @return True if successful
       @warning If useRNG is false, TempKey must already have a valid value
     */
-    bool createNonceRandom(uint8_t tempkey[32], const uint8_t input[20], const bool useRNG = true,
-                           const bool updateSeed = true);
-    /*!
-      @brief Create nonce by input
-      @details Write input to TempKey
-      @param input Input buffer at least 32 bytes
-      @return True if successful
-     */
+    bool createNonce(const atecc608::Destination dest, uint8_t output[32], const uint8_t input[20],
+                     const bool useRNG = true, const bool updateSeed = true);
 
-    inline bool createNoncePassthroughTempKey32(const uint8_t input[32])
-    {
-        return operate_nonce_fixed(atecc608::NONCE_MODE_PASSTHROUGH, input, 32);
-    }
     /*!
-      @brief Create nonce by input
-      @details Write input to message digest bufer
+      @brief write nonce 32 bytes
+      @param dest Output destination
       @param input Input buffer at least 32 bytes
       @return True if successful
      */
-    inline bool createNoncePassthroughMessageDigestBuffer32(const uint8_t input[32])
+    bool writeNonce32(const atecc608::Destination dest, const uint8_t input[32])
     {
-        return operate_nonce_fixed(atecc608::NONCE_MODE_PASSTHROUGH | atecc608::NONCE_MODE_TARGET_MSGDIG, input, 32);
+        return write_nonce(dest, input, 32);
     }
     /*!
-      @brief Create nonce by input
-      @details Write input to alternate key buffer
-      @param input Input buffer at least 32 bytes
-      @return True if successful
-     */
-    inline bool createNoncePassthroughAlternateKeyBuffer32(const uint8_t input[32])
-    {
-        return operate_nonce_fixed(atecc608::NONCE_MODE_PASSTHROUGH | atecc608::NONCE_MODE_TARGET_ALTKEY, input, 32);
-    }
-    /*!
-      @brief Create nonce by input
-      @details Write input to TempKey
+      @brief write nonce 64 bytes
+      @param dest Output destination
       @param input Input buffer at least 64 bytes
       @return True if successful
      */
-    inline bool createNoncePassthroughTempKey64(const uint8_t input[64])
+    bool writeNonce64(const atecc608::Destination dest, const uint8_t input[64])
     {
-        return operate_nonce_fixed(atecc608::NONCE_MODE_PASSTHROUGH | atecc608::NONCE_MODE_INPUT_64, input, 64);
-    }
-    /*!
-      @brief Create nonce by input
-      @details Write input to message digest bufer
-      @param input Input buffer at least 64 bytes
-      @return True if successful
-     */
-    inline bool createNoncePassthroughMessageDigestBuffer64(const uint8_t input[64])
-    {
-        return operate_nonce_fixed(
-            atecc608::NONCE_MODE_PASSTHROUGH | atecc608::NONCE_MODE_INPUT_64 | atecc608::NONCE_MODE_TARGET_MSGDIG,
-            input, 64);
-    }
-    ///@}
-
-    bool readDeviceCertification(uint8_t* out, uint16_t& olen, const bool fillAuthKeyId = true);
-    bool readSignerCertification(uint8_t* out, uint16_t& olen);
-
-    ///@name GenKey
-    ///@{
-    /*!
-      @brief Generate private key to slot
-      @param slot Output slot
-      @param[out] pubKey Output buffer at least 64 bytes
-      @param digest Public key digest is generated and stored in TempKey if true
-      @return True if successful
-     */
-    bool generatePrivateKey(const atecc608::Slot slot, uint8_t pubKey[64], const bool digest = false);
-    /*!
-      @brief Make disposable private key to TempKey and output public key
-      @param[out] pubKey Output buffer at least 64 bytes
-      @return True if successful
-      @note For ECDH etc...
-     */
-    bool generateKey(uint8_t pubKey[64]);
-    /*!
-      @brief Generate public key by private key in slot
-      @param[out] pubKey Output buffer at least 64 bytes
-      @param slot Using private key in slot
-      @param digest Public key digest is generated and stored in TempKey if true
-      @return True if successful
-     */
-    bool generatePublicKey(uint8_t pubKey[64], const atecc608::Slot slot, const bool digest = false);
-    ///@}
-
-    ///@name Sign
-    ///@{
-    /*!
-      @brief Sign internal message
-      @param[out] signature Signature at least 64 butes
-      @param slot Slot
-      @param includeSerial Calculate using serial number if true
-      @param tempkey Using message source the TempKey if true, using message source digest message if false
-      @return True if successful
-     */
-    bool signInternal(uint8_t signature[64], const atecc608::Slot slot, const bool includeSerial = false,
-                      const bool tempKey = true);
-    /*!
-      @brief Sign external message
-      @param[out] signature Signature at least 64 butes
-      @param slot Slot
-      @param includeSerial Calculate using serial number if true
-      @param tempkey Using message source the TempKey if true, using message source digest message if false
-      @return True if successful
-     */
-    bool signExternal(uint8_t signature[64], const atecc608::Slot slot, const bool includeSerial = false,
-                      const bool tempKey = true);
-    ///@}
-
-    ///@name SHA256
-    ///@{
-    /*!
-      @brief Start calculate SHA256
-      @return True if successful
-     */
-    bool startSHA256();
-    /*!
-      @brief Update calculate SHA256
-      @param data Message
-      @param len Length of the message
-      @return True if successful
-     */
-    bool updateSHA256(const uint8_t* data, const uint32_t len);
-    /*!
-      @brief Finalize calculate SHA256
-      @details Digest placed in Output Buffer and TempKey
-      @param[out] hash Output buffer at least 32 bytes
-      @return True if successful
-    */
-    inline bool finalizeSHA256TempKey(uint8_t hash[32])
-    {
-        using namespace m5::unit::atecc608;
-        return finalize_SHA256(hash, SHA_MODE_FINALIZE | SHA_MODE_OUTPUT_TEMPKEY);
-    }
-    /*!
-      @brief Finalize calculate SHA256
-      @details Digest placed in Output Buffer and Message Digest Buffer
-      @param[out] hash Output buffer at least 32 bytes
-      @return True if successful
-    */
-    inline bool finalizeSHA256DigestBuffer(uint8_t hash[32])
-    {
-        using namespace m5::unit::atecc608;
-        return finalize_SHA256(hash, SHA_MODE_FINALIZE | SHA_MODE_OUTPUT_DIGEST);
-    }
-    /*!
-      @brief Finalize calculate SHA256
-      @details Digest placed in Output Buffer only
-      @param[out] hash Output buffer at least 32 bytes
-      @return True if successful
-    */
-    bool finalizeSHA256Output(uint8_t hash[32])
-    {
-        using namespace m5::unit::atecc608;
-        return finalize_SHA256(hash, SHA_MODE_FINALIZE | SHA_MODE_OUTPUT_BUFFER);
-    }
-    /*!
-      @brief Calculate SHA256
-      @param[out] hash Output buffer at least 32 bytes
-      @param data Message
-      @param len Length of the message
-      @return True if successful
-     */
-    inline bool SHA256(uint8_t hash[32], const uint8_t* data, const uint32_t len)
-    {
-        return startSHA256() && updateSHA256(data, len) && finalizeSHA256TempKey(hash);
-    }
-    ///@}
-
-    ///@name ECDH
-    ///@{
-    /*!
-      @brief ECDH(Plane text)
-      @param[out] out Shared Master Secret as clear text at least 32 bytes
-      @param pubKey Public key
-      @param slot ECC private key source Slot
-      @return True if successful
-     */
-    bool ecdhPlaneText(uint8_t out[32], const uint8_t pubKey[64], const atecc608::Slot slot);
-    /*!
-      @brief ECDH(Encrypted)
-      @param[out] out Shared Master Secret as encrypted text at least 32 bytes
-      @param[out] nonce nonce used for encryption
-      @param pubKey Public key
-      @param slot ECC private key source Slot
-      @return True if successful
-     */
-    bool ecdhEncrypted(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64], const atecc608::Slot slot);
-    /*!
-      @brief ECDH(TempKey)
-      @param pubKey Public key
-      @param slot ECC private key source Slot
-      @return True if successful
-     */
-    bool ecdhTempKey(const uint8_t pubKey[64], const atecc608::Slot slot);
-    /*!
-      @brief ECDH(Plane text)
-      @param[out] out Shared Master Secret as clear text at least 32 bytes
-      @param pubKey Public key
-      @return True if successful
-      @note TempKey as its starting value for an ECDH command
-     */
-    bool ecdhPlaneText(uint8_t out[32], const uint8_t pubKey[64]);
-    /*!
-      @brief ECDH(Encrypted)
-      @param[out] out Shared Master Secret as encrypted text at least 32 bytes
-      @param[out] nonce nonce used for encryption
-      @param pubKey Public key
-      @return True if successful
-      @note TempKey as its starting value for an ECDH command
-     */
-    bool ecdhEncrypted(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64]);
-    /*!
-      @brief ECDH(TempKey)
-      @param pubKey Public key
-      @return True if successful
-      @note TempKey as its starting value for an ECDH command
-     */
-    bool ecdhTempKey(const uint8_t pubKey[64]);
-    /*!
-      @brief ECDH(Store to slot)
-      @param slot Output slot
-      @param pubKey Public key
-      @return True if successful
-      @note TempKey as its starting value for an ECDH command
-     */
-    bool ecdhSlot(const atecc608::Slot slot, const uint8_t pubKey[64]);
-    ///@}
-
-    ///@name Verify
-    ///@{
-    /*!
-      @brief Verify a Message with an External Public Key
-      @details Message stored in TempKey
-      @param signature Signature
-      @param  pubKey Public key
-      @return True if successful
-     */
-    inline bool verifyExternalTempKey(const uint8_t signature[64], const uint8_t pubKey[64])
-    {
-        using namespace m5::unit::atecc608;
-        return verify(VERIFY_MODE_EXTERNAL, 0x0004, signature, pubKey);
-    }
-    /*!
-      @brief Verify a Message with an External Public Key
-      @details Message stored in TempKey
-      System Nonce stored in MDB[31:0]
-      Validation MAC is returned
-      @param[out] mac MAC
-      @param signature Signature
-      @param  pubKey Public key
-      @return True if successful
-     */
-    inline bool verifyExternalTempKey(uint8_t mac[32], const uint8_t signature[64], const uint8_t pubKey[64])
-    {
-        using namespace m5::unit::atecc608;
-        return verify(VERIFY_MODE_EXTERNAL | VERIFY_MODE_MAC, 0x0004, signature, pubKey, mac);
-    }
-    /*!
-      @brief Verify a Message with an External Public Key
-      @details Message stored in Message Digest Buffer
-      @param signature Signature
-      @param  pubKey Public key
-      @return True if successful
-     */
-    inline bool verifyExternalDigestBuffer(const uint8_t signature[64], const uint8_t pubKey[64])
-    {
-        using namespace m5::unit::atecc608;
-        return verify(VERIFY_MODE_EXTERNAL | VERIFY_MODE_DIGEST, 0x0004, signature, pubKey);
-    }
-    /*!
-      @brief Verify a Message with an External Public Key
-      @details Message stored in Message Digest Buffer
-      System Nonce stored in MDB[31:0]
-      Validation MAC is returned
-      @param[out] mac MAC
-      @param signature Signature
-      @param  pubKey Public key
-      @return True if successful
-     */
-    inline bool verifyExternalDigestBuffer(uint8_t mac[32], const uint8_t signature[64], const uint8_t pubKey[64])
-    {
-        using namespace m5::unit::atecc608;
-        return verify(VERIFY_MODE_EXTERNAL | VERIFY_MODE_DIGEST | VERIFY_MODE_MAC, 0x0004, signature, pubKey, mac);
-    }
-    /*!
-      @brief Verify a Message with a Stored Key
-      @details Message stored in TempKey
-      @param signature Signature
-      @param slot Slot
-      @return True if successful
-     */
-    inline bool verifyStoredTempKey(const uint8_t signature[64], const atecc608::Slot slot)
-    {
-        using namespace m5::unit::atecc608;
-        return verify(VERIFY_MODE_STORED, m5::stl::to_underlying(slot), signature);
-    }
-    /*!
-      @brief Verify a Message with a Stored Key
-      @details Message stored in TempKey
-      Validation MAC is returned
-      @param[out] mac MAC
-      @param signature Signature
-      @param slot Slot
-      @return True if successful
-     */
-    inline bool verifyStoredTempKey(uint8_t mac[32], const uint8_t signature[64], const atecc608::Slot slot)
-    {
-        using namespace m5::unit::atecc608;
-        return verify(VERIFY_MODE_STORED | VERIFY_MODE_MAC, m5::stl::to_underlying(slot), signature, nullptr, mac);
-    }
-    /*!
-      @brief Verify a Message with a Stored Key
-      @details Message stored in Message Digest Buffer
-      @param signature Signature
-      @param slot Slot
-      @return True if successful
-     */
-    inline bool verifyStoredDigestBuffer(const uint8_t signature[64], const atecc608::Slot slot)
-    {
-        using namespace m5::unit::atecc608;
-        return verify(VERIFY_MODE_STORED | VERIFY_MODE_DIGEST, m5::stl::to_underlying(slot), signature);
-    }
-    /*!
-      @brief Verify a Message with a Stored Key
-      @details Message stored in Message Digest Buffer
-      Validation MAC is returned
-      @param[out] mac MAC
-      @param signature Signature
-      @param slot Slot
-      @return True if successful
-     */
-    inline bool verifyStoredDigestBuffer(uint8_t mac[32], const uint8_t signature[64], const atecc608::Slot slot)
-    {
-        using namespace m5::unit::atecc608;
-        return verify(VERIFY_MODE_STORED | VERIFY_MODE_DIGEST | VERIFY_MODE_MAC, m5::stl::to_underlying(slot),
-                      signature, nullptr, mac);
+        return write_nonce(dest, input, 64);
     }
     ///@}
 
@@ -653,6 +297,83 @@ public:
     }
     ///@}
 
+    ///@name Read
+    ///@{
+    /*!
+      @brief Read the config zone
+      @param[out] config[128] Output buffer at least 128 bytes
+     */
+    bool readConfigZone(uint8_t config[128]);
+
+    /*!
+      @brief Read the serial number
+      @param[out] sn[9] Output buffer at least 9 bytes
+      @return True if successful
+     */
+    bool readSerialNumber(uint8_t sn[9]);
+    /*!
+      @brief Read the serial number as string
+      @param[out] str[9] Output buffer at least 19 bytes
+      @return True if successful
+     */
+    bool readSerialNumber(char str[19]);
+
+    /*!
+      @brief Read the lock state for zone
+      @param[out] configLocked Configurate zone
+      @param[out] dataLocked Data zone
+      @return True if successful
+     */
+    bool readZoneLocked(bool& configLocked, bool& dataLocked);
+    /*!
+      @brief Read the lock state for data zone
+      @param[out] slotLockedBits Bits representing the lock status of each slot
+      @return True if successful
+     */
+    bool readSlotLocked(uint16_t& slotLockedBits);
+    /*!
+      @brief Read the SlotConfig
+      @param[out]  cfg SlotConfig value
+      @param slot Slot
+      @return True if successful
+     */
+    inline bool readSlotConfig(uint16_t& cfg, const atecc608::Slot slot)
+    {
+        constexpr uint8_t SLOT_CONFIG_BASE{20};  // Offset in ConfigZone
+        return read_slot_config_word(cfg, SLOT_CONFIG_BASE, slot);
+    }
+    /*!
+      @brief Read the KeyConfig
+      @param[out]  cfg KeyConfig value
+      @param slot Slot
+      @return True if successful
+     */
+    inline bool readKeyConfig(uint16_t& cfg, const atecc608::Slot slot)
+    {
+        constexpr uint8_t KEY_CONFIG_BASE{96};  // Offset in ConfigZone
+        return read_slot_config_word(cfg, KEY_CONFIG_BASE, slot);
+    }
+
+    /*!
+      @brief Read the data zone
+      @param[out] data Output buffer
+      @param slot Slot
+      @patam len Buffer length
+      @return True if successful
+     */
+    bool readDataZone(uint8_t* data, const uint16_t len, const atecc608::Slot slot);
+    ///@}
+
+    /*!
+      @brief Read the OTP zone
+      @paran[out] Output buffer at least 64 bytes
+      @return True if successful
+     */
+    bool readOTPZone(uint8_t otp[64]);
+    ///@}
+
+    ///@nme SelfTest
+    ///@{
     /*!
       @brief Self test
       @param[out] resultBits The bit corresponding to a failed test is set
@@ -664,44 +385,269 @@ public:
       |00|SHA|AES|ECDH|EECDSA|0|RNG,DRBG|
      */
     bool selfTest(uint8_t resultBits, const uint8_t testBits = 0x3D /* All */);
+    ///@}
 
-#if 0
-bool ::macFromTempKey(uint8_t mac[32])
-{
-    if (!send_command(0x08, 0x08 /* mode: TempKeyのみ */, 0x0000)) {
-        return false;
+    ///@name SHA256
+    ///@{
+    /*!
+      @brief Start calculate SHA256
+      @return True if successful
+     */
+    bool startSHA256();
+    /*!
+      @brief Update calculate SHA256
+      @param msg Message
+      @param mlen Length of the message
+      @return True if successful
+     */
+    bool updateSHA256(const uint8_t* msg, const uint32_t mlen);
+    /*!
+      @brief Finalize calculate SHA256
+      @param dest Output destination (Output buffer is always output)
+      @param[out] digest Output buffer at least 32 bytes
+      @return True if successful
+     */
+    bool finalizeSHA256(const atecc608::Destination dest, uint8_t digest[32]);
+    /*!
+      @brief Calculate SHA256
+      @param dest Output destination (Output buffer is always output)
+      @param[out] digest Output buffer at least 32 bytes
+      @param msg Message
+      @param mlen Length of the message
+      @return True if successful
+     */
+    inline bool SHA256(const atecc608::Destination dest, uint8_t digest[32], const uint8_t* msg, const uint32_t mlen)
+    {
+        return startSHA256() && updateSHA256(msg, mlen) && finalizeSHA256(dest, digest);
+    }
+    ///@}
+
+    ///@warning For TNGTLS, the ECDH command may be run using the ECC private keys stored in Slots 0 and 2-4
+    ///@name ECDH
+    ///@{
+    /*!
+      @brief ECDH (Plane text)
+      @param[out] out Shared Master Secret as clear text at least 32 bytes
+      @param pubKey Public key
+      @param slot ECC private key source Slot
+      @return True if successful
+    */
+    inline bool ECDHStoredKey(uint8_t out[32], const uint8_t pubKey[64], const atecc608::Slot slot)
+    {
+        using namespace m5::unit::atecc608;
+        return ecdh_receive32(out, pubKey, ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_BUFFER, m5::stl::to_underlying(slot));
+    }
+    /*!
+      @brief ECDH (Encrypted)
+      @param[out] out Shared Master Secret as encrypted text at least 32 bytes
+      @param[out] nonce nonce used for encryption
+      @param pubKey Public key
+      @param slot ECC private key source Slot
+      @return True if successful
+     */
+    inline bool ECDHStoredKey(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64], const atecc608::Slot slot)
+    {
+        using namespace m5::unit::atecc608;
+        return ecdh_receive32x2(out, nonce, pubKey, ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_BUFFER | ECDH_MODE_ENCRYPT,
+                                m5::stl::to_underlying(slot));
+    }
+    /*!
+      @brief ECDH (Output to TempKey)
+      @param pubKey Public key
+      @param slot ECC private key source Slot
+      @return True if successful
+     */
+    inline bool ECDHStoredKey(const uint8_t pubKey[64], const atecc608::Slot slot)
+    {
+        using namespace m5::unit::atecc608;
+        return ecdh_no_output(pubKey, ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_TEMPKEY, m5::stl::to_underlying(slot));
+    }
+    /*!
+      @brief ECDH (Plane text)
+      @param[out] out Shared Master Secret as clear text at least 32 bytes
+      @param pubKey Public key
+      @return True if successful
+      @note TempKey as its starting value for an ECDH command
+     */
+    inline bool ECDHTempKey(uint8_t out[32], const uint8_t pubKey[64])
+    {
+        using namespace m5::unit::atecc608;
+        return ecdh_receive32(out, pubKey, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_BUFFER, 0x0000);
+    }
+    /*!
+      @brief ECDH (Encrypted)
+      @param[out] out Shared Master Secret as encrypted text at least 32 bytes
+      @param[out] nonce nonce used for encryption
+      @param pubKey Public key
+      @return True if successful
+      @note TempKey as its starting value for an ECDH command
+     */
+    inline bool ECDHTempKey(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64])
+    {
+        using namespace m5::unit::atecc608;
+        return ecdh_receive32x2(out, nonce, pubKey, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_BUFFER | ECDH_MODE_ENCRYPT,
+                                0x0000);
+    }
+    /*!
+      @brief ECDH (Output to TempKey)
+      @param pubKey Public key
+      @return True if successful
+      @note TempKey as its starting value for an ECDH command
+     */
+    inline bool ECDHTempKey(const uint8_t pubKey[64])
+    {
+        using namespace m5::unit::atecc608;
+        return ecdh_no_output(pubKey, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_TEMPKEY, 0x0000);
+    }
+    /*!
+      @brief ECDH(Store to slot)
+      @param slot Output slot
+      @param pubKey Public key
+      @return True if successful
+      @note TempKey as its starting value for an ECDH command
+     */
+    bool ECDHTempKey(const atecc608::Slot slot, const uint8_t pubKey[64])
+    {
+        using namespace m5::unit::atecc608;
+        return ecdh_no_output(pubKey, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_SLOT, m5::stl::to_underlying(slot));
+    }
+    ///@}
+
+    ///@name GenKey
+    ///@{
+    /*!
+      @brief Generate the private key to slot
+      @param slot Output slot
+      @param[out] pubKey Output buffer at least 64 bytes
+      @param digest Public key digest is generated and stored in TempKey if true
+      @return True if successful
+      @warning For TNGTLS, the GenKey command can be used to generate private keys only in Slots 2, 3 and 4
+     */
+    inline bool generatePrivateKey(const atecc608::Slot slot, uint8_t pubKey[64], const bool digest = false)
+    {
+        using namespace m5::unit::atecc608;
+        return generate_key(pubKey, GENKEY_MODE_PRIVATE | (digest ? GENKEY_MODE_DIGEST : 0x00),
+                            m5::stl::to_underlying(slot));
+    }
+    /*!
+      @brief Make disposable private key to TempKey and output public key
+      @param[out] pubKey Output buffer at least 64 bytes
+      @return True if successful
+     */
+    bool generateKey(uint8_t pubKey[64]);
+    /*!
+      @brief Generate the public key from private key in slot
+      @param[out] pubKey Output buffer at least 64 bytes
+      @param slot Private key Slot
+      @param digest Public key digest is generated and stored in TempKey if true
+      @return True if successful
+     */
+    inline bool generatePublicKey(uint8_t pubKey[64], const atecc608::Slot slot, const bool digest = false)
+    {
+        using namespace m5::unit::atecc608;
+        return generate_key(pubKey, GENKEY_MODE_PUBLIC | (digest ? GENKEY_MODE_DIGEST : 0x00),
+                            m5::stl::to_underlying(slot));
+    }
+    /*!
+      @brief Generate digest of a public key and stored in TempKey
+      @param slot Public key slot
+      @return True if successful
+      @warning For TNGTLS, a digest can be created from Slot 11
+     */
+    bool generatePublicKeyDigest(const atecc608::Slot slot);
+    ///@}
+
+    ///@name Sign
+    ///@{
+    /*!
+      @brief Sign internal message
+      @param[out] signature Signature at least 64 butes
+      @param slot Slot of the private key to be used to sign the message
+      @param src Message source
+      @param includeSerial Serial number is included in the message digest calculation
+      @return True if successful
+      @warning For TNGTLS device, only Slot 1 is capable of signing internally generated messages
+    */
+    inline bool signInternal(uint8_t signature[64], const atecc608::Slot slot, const atecc608::Source src,
+                             const bool includeSerial = false)
+    {
+        using namespace m5::unit::atecc608;
+        return sign(signature, (SIGN_MODE_INTERNAL | (includeSerial ? SIGN_MODE_INCLUDE_SN : 0x00)),
+                    m5::stl::to_underlying(slot), src);
+    }
+    /*!
+      @brief Sign external message
+      @param[out] signature Signature at least 64 butes
+      @param slot Private key slot used to sign the message
+      @param src Message source
+      @param includeSerial Serial number is included in the message digest calculation
+      @return True if successful
+      @warning For TNGTLS device, Slots 0 and 2-4 are enabled to sign external messages
+    */
+    inline bool signExternal(uint8_t signature[64], const atecc608::Slot slot, const atecc608::Source src,
+                             const bool includeSerial = false)
+    {
+        using namespace m5::unit::atecc608;
+        return sign(signature, (SIGN_MODE_EXTERNAL | (includeSerial ? SIGN_MODE_INCLUDE_SN : 0x00)),
+                    m5::stl::to_underlying(slot), src);
+    }
+    ///@}
+
+    ///@name Verify
+    ///@{
+    /*!
+      @brief Verify the external public key
+      @param[out] mac validating MAC output buffer if not nullptr
+      @param signature Signature to be verified
+      @param pubKey  public key to be used for verification
+      @param src Message source
+      @return True if successful
+     */
+    inline bool verifyExternal(uint8_t mac[32], const uint8_t signature[64], const uint8_t pubKey[64],
+                               const atecc608::Source src)
+    {
+        using namespace m5::unit::atecc608;
+        return verify(mac, VERIFY_MODE_EXTERNAL | (mac ? VERIFY_MODE_MAC : 0x00), 0x0004 /* P256 */, signature, pubKey,
+                      src);
+    }
+    /*!
+      @brief Verify the stored publick key
+      @param[out] mac validating MAC output buffer if not nullptr
+      @param signature Signature to be verified
+      @param slot Slot containing the public key to be used for the verification
+      @param src Message source
+      @return True if successful
+     */
+    inline bool verifyStored(uint8_t mac[32], const uint8_t signature[64], const atecc608::Slot slot,
+                             const atecc608::Source src)
+    {
+        using namespace m5::unit::atecc608;
+        return verify(mac, VERIFY_MODE_STORED | (mac ? VERIFY_MODE_MAC : 0x00), m5::stl::to_underlying(slot), signature,
+                      nullptr, src);
     }
 
-    m5::utility::delay(15);
-
-    return receive_response(mac, 32) && idle();
-}
-#endif
-
+    // @todo AES, CheckMac, GenDig, KDF, MAC command support
+    
 protected:
     bool send_command(const uint8_t opcode, const uint8_t param1 = 0, const uint16_t param2 = 0,
                       const uint8_t* data = nullptr, uint32_t dlen = 0);
     bool receive_response(uint8_t* data, const uint32_t dlen);
+
+    bool counter(uint32_t& value, const uint8_t counter, const uint8_t mode);
+    bool write_nonce(const atecc608::Destination dest, const uint8_t* input, const uint32_t ilen);
     bool read_data(uint8_t* rbuf, const uint32_t rlen, const uint8_t zone, const uint16_t address,
                    const uint32_t delayMs = 3 /* read default */);
-
     bool read_slot_config_word(uint16_t& cfg, const uint8_t baseOffset, const atecc608::Slot slot);
+    virtual bool ecdh_receive32(uint8_t out[32], const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2);
+    virtual bool ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64], const uint8_t mode,
+                                  const uint16_t param2);
+    virtual bool ecdh_no_output(const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2);
+    virtual bool generate_key(uint8_t pubKey[64], const uint8_t mode, const uint16_t param2 = 0x0000,
+                              const uint8_t* data = nullptr, const uint32_t dlen = 0);
+    virtual bool sign(uint8_t signature[64], const uint8_t mode, const uint16_t param2, const atecc608::Source src);
 
-    bool operate_counter(uint32_t& value, const uint8_t counter, const uint8_t mode);
-    bool operate_nonce_fixed(const uint8_t mode, const uint8_t* input, const uint32_t ilen);
-
-    bool finalize_SHA256(uint8_t hash[32], const uint8_t mode);
-
-    bool generate_key(uint8_t pubKey[64], const uint8_t mode, const uint16_t param2 = 0x0000,
-                      const uint8_t* data = nullptr, const uint32_t dlen = 0);
-
-    bool ecdh_receive32(uint8_t out[32], const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2);
-    bool ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64], const uint8_t mode,
-                          const uint16_t param2);
-    bool ecdh_no_output(const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2);
-
-    bool verify(const uint8_t mode, const uint16_t param2, const uint8_t signature[64],
-                const uint8_t pubKey[64] = nullptr, uint8_t mac_out[32] = nullptr);
+    bool verify(uint8_t mac[32], const uint8_t mode, const uint16_t param2, const uint8_t signature[64],
+                const uint8_t pubKey[64], const atecc608::Source src);
 
 private:
     config_t _cfg{};

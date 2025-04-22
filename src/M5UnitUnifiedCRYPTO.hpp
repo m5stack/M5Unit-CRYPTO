@@ -14,6 +14,7 @@
 #define M5_UNIT_UNIFIED_CRYPTO_HPP
 
 #include "unit/unit_ATECC608B.hpp"
+#include "unit/unit_ATECC608B_TNGTLS.hpp"
 
 /*!
   @namespace m5
@@ -25,8 +26,8 @@ namespace m5 {
   @brief Unit-related namespace
  */
 namespace unit {
-//! @brief Alias for M5Stack's UnitID(SKU:U124) unit (internally uses ATECC680B)
-using UnitID = m5::unit::UnitATECC608B;
+//! @brief Alias for M5Stack's UnitID(SKU:U124) unit (internally uses ATECC680B-TNGTLS)
+using UnitID = m5::unit::UnitATECC608B_TNGTLS;
 
 }  // namespace unit
 }  // namespace m5

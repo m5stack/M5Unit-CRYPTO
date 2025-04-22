@@ -83,107 +83,108 @@ constexpr uint8_t template_for_signer[] = {
 constexpr uint32_t template_for_device_size{sizeof(template_for_device)};
 constexpr uint32_t template_for_signer_size{sizeof(template_for_signer)};
 
-constexpr char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+constexpr char b64_table_std[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+constexpr char b64_table_url[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-bool convertToPEM(char* out, const uint32_t out_len, const uint8_t* der, uint32_t dlen, const char* header,
-                  const char* footer)
+uint32_t encode_base64(char* out, const uint32_t olen, const uint8_t* buf, const uint32_t blen, const uint8_t line_len,
+                       const bool urlEncode, const bool padding)
 {
-    if (!der || !dlen || !header || !footer || !out || !out_len) {
-        return false;
+    const char* b64_table = urlEncode ? b64_table_url : b64_table_std;
+
+    if (!out || !olen || !buf || !blen) {
+        return 0;
     }
 
-    uint32_t needed = 0;
-    needed += strlen("-----BEGIN -----\n");
-    needed += strlen(header);
-    needed += (dlen + 2) / 3 * 4;
-    needed += (needed / 64) * 1;  // line breaks
-    needed += strlen("-----END -----\n");
-    needed += strlen(footer);
-    needed += 2;  // null terminator
+    uint32_t written  = 0;
+    uint32_t line_pos = 0;
 
-    if (needed > out_len) {
-        return false;
-    }
+    for (uint32_t i = 0; i < blen; i += 3) {
+        uint32_t val    = (buf[i] << 16);
+        bool has_second = (i + 1 < blen);
+        bool has_third  = (i + 2 < blen);
+        if (has_second) val |= (buf[i + 1] << 8);
+        if (has_third) val |= buf[i + 2];
 
-    uint32_t written  = snprintf(out, out_len, "-----BEGIN %s-----\n", header);
-    uint32_t line_len = 0;
-
-    for (uint32_t i = 0; i < dlen;) {
-        if (written + 4 >= out_len) return false;
-
-        uint32_t val = der[i++] << 16;
-        if (i < dlen) val |= der[i++] << 8;
-        if (i < dlen) val |= der[i++];
+        if (written + 4 >= olen) {
+            return 0;
+        }
 
         out[written++] = b64_table[(val >> 18) & 0x3F];
         out[written++] = b64_table[(val >> 12) & 0x3F];
-        out[written++] = (i - 1 < dlen + 1) ? b64_table[(val >> 6) & 0x3F] : '=';
-        out[written++] = (i <= dlen) ? b64_table[val & 0x3F] : '=';
+        out[written++] = has_second ? b64_table[(val >> 6) & 0x3F] : (padding ? '=' : '\0');
+        out[written++] = has_third ? b64_table[val & 0x3F] : (padding ? '=' : '\0');
 
-        line_len += 4;
-        if (line_len >= 64) {
-            if (written + 1 >= out_len) {
-                return false;
+        if (!has_second && !padding) written--;
+        if (!has_third && !padding) written--;
+
+        line_pos += 4;
+        if (line_len > 0 && line_pos >= line_len && !urlEncode) {
+            if (written + 1 >= olen) {
+                return 0;
             }
             out[written++] = '\n';
-            line_len       = 0;
+            line_pos       = 0;
         }
     }
 
-    if (line_len > 0) {
-        if (written + 1 >= out_len) {
-            return false;
+    if (line_len > 0 && line_pos > 0 && !urlEncode) {
+        if (written + 1 >= olen) {
+            return 0;
         }
         out[written++] = '\n';
     }
 
-    if (written + strlen("-----END -----\n") + strlen(footer) + 1 >= out_len) {
+    if (written < olen) {
+        out[written] = '\0';
+    }
+
+    return written;
+}
+
+bool convertToPEM(char* out, const uint32_t olen, const uint8_t* der, uint32_t dlen, const char* header,
+                  const char* footer)
+{
+    if (!der || !dlen || !header || !footer || !out || !olen) {
         return false;
     }
-    written += snprintf(out + written, out_len - written, "-----END %s-----\n", footer);
 
-    out[written] = '\0';
+    // 実際に必要なサイズを計算
+    const uint32_t base64_len        = ((dlen + 2) / 3) * 4;
+    const uint32_t line_breaks       = (base64_len + 63) / 64;  // 毎64文字で改行
+    const uint32_t total_b64_out_len = base64_len + line_breaks;
+
+    const uint32_t needed = strlen("-----BEGIN -----\n") + strlen(header) + total_b64_out_len +
+                            strlen("-----END -----\n") + strlen(footer) + 1;  // '\0'
+
+    if (needed > olen) {
+        return false;
+    }
+
+    uint32_t written = 0;
+
+    // 先頭のヘッダー行
+    written += snprintf(out + written, olen - written, "-----BEGIN %s-----\n", header);
+
+    // Base64エンコード本体
+    uint32_t b64_written = encode_base64(out + written, olen - written, der, dlen, 64, false, true);
+    if (b64_written == 0) {
+        return false;
+    }
+    written += b64_written;
+
+    // フッター行
+    written += snprintf(out + written, olen - written, "-----END %s-----\n", footer);
+
+    // 明示的にnull終端
+    if (written < olen) {
+        out[written] = '\0';
+    }
+
     return true;
 }
 
 void printPEM(const uint8_t* der, const uint32_t dlen, const char* header, const char* footer)
 {
-#if 0
-    if (!header || !footer || !der || !dlen) {
-        return;
-    }
-
-    M5.Log.printf("-----BEGIN %s-----\n", header);
-
-    constexpr char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    char line[65]              = {0};
-    uint32_t line_len          = 0;
-
-    uint32_t i = 0;
-    while (i < dlen) {
-        uint32_t val = der[i++] << 16;
-        if (i < dlen) val |= der[i++] << 8;
-        if (i < dlen) val |= der[i++];
-
-        line[line_len++] = b64_table[(val >> 18) & 0x3F];
-        line[line_len++] = b64_table[(val >> 12) & 0x3F];
-        line[line_len++] = (i - 1 < dlen + 1) ? b64_table[(val >> 6) & 0x3F] : '=';
-        line[line_len++] = (i <= dlen) ? b64_table[val & 0x3F] : '=';
-
-        if (line_len == 64) {
-            line[line_len] = '\0';
-            M5.Log.printf("%s\n", line);
-            line_len = 0;
-        }
-    }
-
-    if (line_len > 0) {
-        line[line_len] = '\0';
-        M5.Log.printf("%s\n", line);
-    }
-
-    M5.Log.printf("-----END %s-----\n", footer);
-#endif
     char buf[1024]{};
     if (convertToPEM(buf, sizeof(buf), der, dlen, header, footer)) {
         M5.Log.printf(buf);
