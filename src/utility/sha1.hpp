@@ -19,6 +19,7 @@ namespace utility {
 /*!
   @class m5::utility::SHA1
   @brief Calculate SHA1 (RFC3174)
+  @warning Only byte-by-byte input is accepted
  */
 class SHA1 {
 public:

@@ -62,6 +62,22 @@ public:
     }
     ///@}
 
+    /*!
+      @brief Get the revison
+      @return uint8_t[4]
+      @warning Void if obtained before  begin()
+     */
+    inline const uint8_t* revision() const
+    {
+        return _revision.data();
+    }
+
+    //! @brief Gets the size of the specified data slot in bytes
+    inline uint16_t getSlotSize(const atecc608::Slot slot) const
+    {
+        return _slotSize[m5::stl::to_underlying(slot)];
+    }
+
     ///@name State transition
     ///@{
     /*!
@@ -125,6 +141,8 @@ public:
       @param[out] valid ECC key is valid if true
       @param slot Slot
       @return True if successful
+      @warning For TNGTLS device, the keys stored in Slots 1-4 are ECC keys that can be checked with theKeyValid mode of
+      the Info command
      */
     bool readKeyValid(bool& valid, const atecc608::Slot slot);
     /*!
@@ -134,15 +152,15 @@ public:
       @note Status flags
       |bit|name|decription|
       |---|---|---|
-      |15|TempKey.Valid| Valid if 1|
-      |14:11|AuthComplete.KeyID|Authorization keyslot ID|
-      |10|AuthComplete.Valid| Valid if 1|
-      |9:8| | No use|
-      |7|TempKey.NoMacFlag| Valid if 1|
-      |6|TempKey.GenKeyData| Valid if 1|
-      |5|TempKey.GenDigData| Valid if 1|
-      |4|TempKey.SourceFlag| Fixed souerce if 1, RNG source if 0|
-      |3:0|TempKey.KeyID| TempKey keyslot ID|
+      |15|TempKey.NoMacFlag| Valid if 1|
+      |14|TempKey.GenKeyData| Valid if 1|
+      |13|TempKey.GenDigData| Valid if 1|
+      |12|TempKey.SourceFlag|1:TempKey is derived from external input 0:TempKey is derived from internal RNG only|
+      |11:8|TempKey.KeyID| TempKey keyslot ID|
+      |7|TempKey.Valid| Valid if 1|
+      |6:3|AuthComplete.KeyID|Authorization keyslot ID|
+      |2|AuthComplete.Valid| Valid if 1|
+      |1:0| No use| b00|
      */
     bool readDeviceState(uint16_t& state);
     ///@}
@@ -150,8 +168,7 @@ public:
     ///@name Nonce
     ///@{
     /*!
-      @brief Create nonce by input data with RNG or TempKey.
-      @param dest Output destination
+      @brief Create nonce to TempKey by input data with RNG or TempKey.
       @param[out] output Output buffer at least 32 bytes if not nullptr
       @param input Input buffer at least 20 bytes
       @param useRNG Using TRNG if true, Using TempKey if false
@@ -159,8 +176,8 @@ public:
       @return True if successful
       @warning If useRNG is false, TempKey must already have a valid value
     */
-    bool createNonce(const atecc608::Destination dest, uint8_t output[32], const uint8_t input[20],
-                     const bool useRNG = true, const bool updateSeed = true);
+    bool createNonce(uint8_t output[32], const uint8_t input[20], const bool useRNG = true,
+                     const bool updateSeed = true);
 
     /*!
       @brief write nonce 32 bytes
@@ -205,7 +222,6 @@ public:
     bool readRandom(T& value, const T lower, const T upper)
     {
         static_assert(sizeof(T) <= 32, "readRandom only supports types up to 32 bytes");
-
         value = lower;
         if (upper <= lower) {
             M5_LIB_LOGE("lower must be less than upper");
@@ -215,10 +231,8 @@ public:
         using U       = typename std::make_unsigned<T>::type;
         const U range = static_cast<U>(upper - lower);
         const U limit = std::numeric_limits<U>::max() - (std::numeric_limits<U>::max() % range);
-
         uint8_t rv[32]{};
         uint_fast8_t offset{};
-
         while (true) {
             if (!readRandomArray(rv)) {
                 return false;
@@ -236,7 +250,6 @@ public:
                 return true;
             }
         }
-
         return false;
     }
     /*!
@@ -247,6 +260,7 @@ public:
       @param upper The upper bound (exclusive)
       @return True if successful
       @note Output range is [lower, upper) - that is, lower <= value < upper
+      @warning Note that if the difference between lower and higher is too large, nan/inf will result
     */
     template <typename T, typename std::enable_if<std::is_floating_point<T>::value, std::nullptr_t>::type = nullptr>
     bool readRandom(T& value, const T lower, const T upper)
@@ -256,12 +270,10 @@ public:
             M5_LIB_LOGE("lower must be less than upper");
             return false;
         }
-
         uint8_t rv[32]{};
         if (!readRandomArray(rv)) {
             return false;
         }
-
         uint32_t raw{};
         memcpy(&raw, rv, sizeof(uint32_t));  // use first 4 bytes
 
@@ -269,7 +281,7 @@ public:
         constexpr double norm = 1.0 / static_cast<double>(std::numeric_limits<uint32_t>::max());
         double r              = static_cast<double>(raw) * norm;
         value                 = static_cast<T>(lower + r * static_cast<double>(upper - lower));
-        return true;
+        return std::isfinite(value);
     }
     /*!
       @brief Generate a random integral value covering the entire valid range of type T
@@ -360,9 +372,9 @@ public:
       @param slot Slot
       @patam len Buffer length
       @return True if successful
-     */
+      @warning For TNGTLS Only read slot are Slot 5,8,10,11,12
+    */
     bool readDataZone(uint8_t* data, const uint16_t len, const atecc608::Slot slot);
-    ///@}
 
     /*!
       @brief Read the OTP zone
@@ -372,7 +384,7 @@ public:
     bool readOTPZone(uint8_t otp[64]);
     ///@}
 
-    ///@nme SelfTest
+    ///@name SelfTest
     ///@{
     /*!
       @brief Self test
@@ -428,39 +440,39 @@ public:
     /*!
       @brief ECDH (Plane text)
       @param[out] out Shared Master Secret as clear text at least 32 bytes
-      @param pubKey Public key
       @param slot ECC private key source Slot
+      @param pubKey Public key
       @return True if successful
     */
-    inline bool ECDHStoredKey(uint8_t out[32], const uint8_t pubKey[64], const atecc608::Slot slot)
+    inline bool ECDHStoredKey(uint8_t out[32], const atecc608::Slot slot, const uint8_t pubKey[64])
     {
         using namespace m5::unit::atecc608;
-        return ecdh_receive32(out, pubKey, ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_BUFFER, m5::stl::to_underlying(slot));
+        return ecdh_receive32(out, ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_BUFFER, m5::stl::to_underlying(slot), pubKey);
     }
     /*!
       @brief ECDH (Encrypted)
       @param[out] out Shared Master Secret as encrypted text at least 32 bytes
       @param[out] nonce nonce used for encryption
-      @param pubKey Public key
       @param slot ECC private key source Slot
+      @param pubKey Public key
       @return True if successful
      */
-    inline bool ECDHStoredKey(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64], const atecc608::Slot slot)
+    inline bool ECDHStoredKey(uint8_t out[32], uint8_t nonce[32], const atecc608::Slot slot, const uint8_t pubKey[64])
     {
         using namespace m5::unit::atecc608;
-        return ecdh_receive32x2(out, nonce, pubKey, ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_BUFFER | ECDH_MODE_ENCRYPT,
-                                m5::stl::to_underlying(slot));
+        return ecdh_receive32x2(out, nonce, ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_BUFFER | ECDH_MODE_ENCRYPT,
+                                m5::stl::to_underlying(slot), pubKey);
     }
     /*!
-      @brief ECDH (Output to TempKey)
-      @param pubKey Public key
+      @brief ECDH (Stored in  TempKey)
       @param slot ECC private key source Slot
+      @param pubKey Public key
       @return True if successful
      */
-    inline bool ECDHStoredKey(const uint8_t pubKey[64], const atecc608::Slot slot)
+    inline bool ECDHStoredKey(const atecc608::Slot slot, const uint8_t pubKey[64])
     {
         using namespace m5::unit::atecc608;
-        return ecdh_no_output(pubKey, ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_TEMPKEY, m5::stl::to_underlying(slot));
+        return ecdh_no_output(ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_TEMPKEY, m5::stl::to_underlying(slot), pubKey);
     }
     /*!
       @brief ECDH (Plane text)
@@ -472,7 +484,7 @@ public:
     inline bool ECDHTempKey(uint8_t out[32], const uint8_t pubKey[64])
     {
         using namespace m5::unit::atecc608;
-        return ecdh_receive32(out, pubKey, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_BUFFER, 0x0000);
+        return ecdh_receive32(out, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_BUFFER, 0x0000, pubKey);
     }
     /*!
       @brief ECDH (Encrypted)
@@ -485,11 +497,11 @@ public:
     inline bool ECDHTempKey(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64])
     {
         using namespace m5::unit::atecc608;
-        return ecdh_receive32x2(out, nonce, pubKey, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_BUFFER | ECDH_MODE_ENCRYPT,
-                                0x0000);
+        return ecdh_receive32x2(out, nonce, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_BUFFER | ECDH_MODE_ENCRYPT, 0x0000,
+                                pubKey);
     }
     /*!
-      @brief ECDH (Output to TempKey)
+      @brief ECDH (Stored in to TempKey)
       @param pubKey Public key
       @return True if successful
       @note TempKey as its starting value for an ECDH command
@@ -497,10 +509,10 @@ public:
     inline bool ECDHTempKey(const uint8_t pubKey[64])
     {
         using namespace m5::unit::atecc608;
-        return ecdh_no_output(pubKey, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_TEMPKEY, 0x0000);
+        return ecdh_no_output(ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_TEMPKEY, 0x0000, pubKey);
     }
     /*!
-      @brief ECDH(Store to slot)
+      @brief ECDH(Stored in slot)
       @param slot Output slot
       @param pubKey Public key
       @return True if successful
@@ -509,14 +521,14 @@ public:
     bool ECDHTempKey(const atecc608::Slot slot, const uint8_t pubKey[64])
     {
         using namespace m5::unit::atecc608;
-        return ecdh_no_output(pubKey, ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_SLOT, m5::stl::to_underlying(slot));
+        return ecdh_no_output(ECDH_MODE_SRC_TEMPKEY | ECDH_MODE_OUTPUT_SLOT, m5::stl::to_underlying(slot), pubKey);
     }
     ///@}
 
     ///@name GenKey
     ///@{
     /*!
-      @brief Generate the private key to slot
+      @brief Generate the private key stored in slot
       @param slot Output slot
       @param[out] pubKey Output buffer at least 64 bytes
       @param digest Public key digest is generated and stored in TempKey if true
@@ -551,10 +563,11 @@ public:
     /*!
       @brief Generate digest of a public key and stored in TempKey
       @param slot Public key slot
+      @param otherData Other data for use in digest calculations at leaset 3 byes (nullptrAllowed)
       @return True if successful
       @warning For TNGTLS, a digest can be created from Slot 11
      */
-    bool generatePublicKeyDigest(const atecc608::Slot slot);
+    bool generatePublicKeyDigest(const atecc608::Slot slot, const uint8_t otherData[3] = nullptr);
     ///@}
 
     ///@name Sign
@@ -625,23 +638,30 @@ public:
         return verify(mac, VERIFY_MODE_STORED | (mac ? VERIFY_MODE_MAC : 0x00), m5::stl::to_underlying(slot), signature,
                       nullptr, src);
     }
+    ///@}
 
-    // @todo AES, CheckMac, GenDig, KDF, MAC command support
-    
+    // @todo UpdateExtra, Write, AES, CheckMac, GenDig, KDF, MAC command support
+
 protected:
+    virtual bool begin_impl();
+
     bool send_command(const uint8_t opcode, const uint8_t param1 = 0, const uint16_t param2 = 0,
                       const uint8_t* data = nullptr, uint32_t dlen = 0);
     bool receive_response(uint8_t* data, const uint32_t dlen);
 
     bool counter(uint32_t& value, const uint8_t counter, const uint8_t mode);
+
     bool write_nonce(const atecc608::Destination dest, const uint8_t* input, const uint32_t ilen);
+
     bool read_data(uint8_t* rbuf, const uint32_t rlen, const uint8_t zone, const uint16_t address,
                    const uint32_t delayMs = 3 /* read default */);
     bool read_slot_config_word(uint16_t& cfg, const uint8_t baseOffset, const atecc608::Slot slot);
-    virtual bool ecdh_receive32(uint8_t out[32], const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2);
-    virtual bool ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64], const uint8_t mode,
-                                  const uint16_t param2);
-    virtual bool ecdh_no_output(const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2);
+
+    virtual bool ecdh_receive32(uint8_t out[32], const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64]);
+    virtual bool ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t mode, const uint16_t param2,
+                                  const uint8_t pubKey[64]);
+    virtual bool ecdh_no_output(const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64]);
+
     virtual bool generate_key(uint8_t pubKey[64], const uint8_t mode, const uint16_t param2 = 0x0000,
                               const uint8_t* data = nullptr, const uint32_t dlen = 0);
     virtual bool sign(uint8_t signature[64], const uint8_t mode, const uint16_t param2, const atecc608::Source src);
@@ -651,6 +671,12 @@ protected:
 
 private:
     config_t _cfg{};
+    std::array<uint8_t, 4> _revision{};
+    std::array<uint16_t, 16> _slotSize{
+        36,  36, 36, 36, 36, 36, 36, 36,  // slot 0〜7
+        416,                              // slot 8
+        72,  72, 72, 72, 72, 72, 72       // slot 9〜15
+    };
 };
 
 }  // namespace unit

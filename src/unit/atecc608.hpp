@@ -49,7 +49,7 @@ enum class Source : uint8_t {
     TempKey,             //!< TempKey
     MsgDigestBuffer,     //!< Message digest buffer
     AlternateKeyBuffer,  //!< Alternate Key Buffer
-    OutputBuffer,        //!< Any  buffer
+    ExternalBuffer,      //!< Any  buffer
 };
 /*!
   @enum Destination
@@ -80,7 +80,8 @@ enum Error : uint8_t {
     CRC_OR_COMMUNICATION_ERROR = 0XFF,
 };
 
-///@name Delay time for send/receive
+///@cond
+///@name Delay time between send and receive
 ///@{
 constexpr uint32_t DELAY_READ{3};
 constexpr uint32_t DELAY_WRITE{4};
@@ -98,7 +99,7 @@ constexpr uint32_t DELAY_VERIFY{105};
 
 ///@name Word address
 ///@{
-constexpr uint8_t WORD_ADRESS_VALUE_RESET{0x00};
+constexpr uint8_t WORD_VALUE_RESET{0x00};
 constexpr uint8_t WORD_ADRESS_VALUE_SLEEP{0x01};
 constexpr uint8_t WORD_ADRESS_VALUE_IDLE{0x02};
 constexpr uint8_t WORD_ADRESS_VALUE_COMMAND{0x03};
@@ -107,7 +108,7 @@ constexpr uint8_t WORD_ADRESS_VALUE_COMMAND{0x03};
 ///@name Operation code
 ///@{
 constexpr uint8_t OPCODE_READ{0x02};
-constexpr uint8_t OPCODE_WRITE{0x12};
+// constexpr uint8_t OPCODE_WRITE{0x12};
 constexpr uint8_t OPCODE_NONCE{0x16};
 // constexpr uint8_t OPCODE_LOCK{0x17};
 constexpr uint8_t OPCODE_RANDOM{0x1B};
@@ -128,12 +129,6 @@ constexpr uint8_t INFO_MODE_KEYVALID{0x01};
 constexpr uint8_t INFO_MODE_DEVICE_STATE{0x02};
 ///@}
 
-///@name Random
-///@{
-constexpr uint8_t RANDOM_MODE_UPDATE_SEED{0x00};
-constexpr uint8_t RANDOM_MODE_NOT_UPDATE_SEED{0x01};
-///@}
-
 ///@name Nonce
 ///@{
 constexpr uint8_t NONCE_MODE_RANDOM_UPDATE_SEED{0x00};
@@ -149,6 +144,12 @@ constexpr uint16_t NONCE_USE_TRNG{0x0000};
 constexpr uint16_t NONCE_USE_TEMPKEY{0x8000};
 ///@}
 
+///@name Random
+///@{
+constexpr uint8_t RANDOM_MODE_UPDATE_SEED{0x00};
+constexpr uint8_t RANDOM_MODE_NOT_UPDATE_SEED{0x01};
+///@}
+
 ///@name SHA
 ///@{
 constexpr uint8_t SHA_MODE_START{0x00};
@@ -158,24 +159,6 @@ constexpr uint8_t SHA_MODE_OUTPUT_TEMPKEY{0x00};
 constexpr uint8_t SHA_MODE_OUTPUT_DIGEST{0x40};
 constexpr uint8_t SHA_MODE_OUTPUT_BUFFER{0xC0};
 ///@}
-
-///@name GenKey
-///@{
-constexpr uint8_t GENKEY_MODE_PUBLIC{0x00};
-constexpr uint8_t GENKEY_MODE_PRIVATE{0x04};
-constexpr uint8_t GENKEY_MODE_DIGEST{0x08};
-constexpr uint8_t GENKEY_MODE_PUBLIC_DIGEST{0x10};
-///@}
-
-///@name Sign
-///@{
-constexpr uint8_t SIGN_MODE_INTERNAL{0x00};
-constexpr uint8_t SIGN_MODE_INVALIDATE{0x01};
-constexpr uint8_t SIGN_MODE_INCLUDE_SN{0x40};
-constexpr uint8_t SIGN_MODE_EXTERNAL{0x80};
-
-constexpr uint8_t SIGN_MODE_TEMPKEY{0x00};
-constexpr uint8_t SIGN_MODE_DIGEST{0x20};
 
 ///@name ECDH
 ///@{
@@ -190,6 +173,23 @@ constexpr uint8_t ECDH_MODE_OUTPUT_BUFFER{0x0C};
 constexpr uint8_t ECDH_MODE_OUTPUT_SLOT{0x04};
 ///@}
 
+///@name GenKey
+///@{
+constexpr uint8_t GENKEY_MODE_PUBLIC{0x00};
+constexpr uint8_t GENKEY_MODE_PRIVATE{0x04};
+constexpr uint8_t GENKEY_MODE_DIGEST{0x08};
+constexpr uint8_t GENKEY_MODE_PUBLIC_DIGEST{0x10};
+///@}
+
+///@name Sign
+///@{
+constexpr uint8_t SIGN_MODE_INTERNAL{0x00};
+constexpr uint8_t SIGN_MODE_INCLUDE_SN{0x40};
+constexpr uint8_t SIGN_MODE_EXTERNAL{0x80};
+
+constexpr uint8_t SIGN_MODE_TEMPKEY{0x00};
+constexpr uint8_t SIGN_MODE_DIGEST{0x20};
+
 ///@name Verify
 ///@{
 constexpr uint8_t VERIFY_MODE_STORED{0x00};
@@ -200,20 +200,7 @@ constexpr uint8_t VERIFY_MODE_DIGEST{0x20};
 
 constexpr uint8_t VERIFY_MODE_MAC{0x80};
 ///@}
-
-///@cond
-constexpr uint16_t slot_data_size_table[16] = {
-    36,  36, 36, 36, 36, 36, 36, 36,  // slot 0〜7
-    416,                              // slot 8
-    72,  72, 72, 72, 72, 72, 72       // slot 9〜15
-};
 ///@endcond
-
-//! @brief Get the data storage size of the slot
-constexpr uint16_t slotDataSize(const Slot s)
-{
-    return slot_data_size_table[(uint8_t)s];
-}
 
 //! @brief Conversion offset to address for Config,OTP zone
 inline uint16_t offset_to_param2_for_config(const uint8_t offset)
@@ -230,38 +217,15 @@ inline uint16_t slot_block_to_param2(const uint8_t slot, const uint8_t offset)
     return (slot << 3) | (block << 8) | word_offset;
 }
 
-/*!
-  @brief encode Base64
-  @param[out] out Output buffer
-  @param olen Output buffer length
-  @param buf Input buffer
-  @param blen Input buffer length
-  @param line_len ==0 No line breaks ! =0: Line break at that number of characters
-  @param urlEncode base64url encoding if true
-  @param padding Enable padding if true
-  @return Encoded length
- */
-uint32_t encode_base64(char* out, const uint32_t olen, const uint8_t* buf, const uint32_t blen, const uint8_t line_len,
-                       const bool urlEncode, const bool padding);
-
-//! @brief Encode Base64(PEM)
-inline bool encodeBase64(char* out, const uint32_t olen, const uint8_t* buf, const uint32_t blen)
+//! @brief Calculate encoded size (no line break)
+constexpr inline uint32_t encoded_base64_length(const uint32_t ilen)
 {
-    return encode_base64(out, olen, buf, blen, 64, false, true);
-}
-//! @brief Encode Base64URL
-inline bool encodeBase64URL(char* out, const uint32_t olen, const uint8_t* buf, const uint32_t blen)
-{
-    return encode_base64(out, olen, buf, blen, 0, true, false);
+    return ((ilen + 2) / 3) * 4;
 }
 
 //! @brief Convert der to pem
 bool convertToPEM(char* out, const uint32_t out_len, const uint8_t* der, uint32_t dlen,
                   const char* header = "CERTIFICATE", const char* footer = "CERTIFICATE");
-
-//! @brief Print PEM to serial
-void printPEM(const uint8_t* der, const uint32_t dlen, const char* header = "CERTIFICATE",
-              const char* footer = "CERTIFICATE");
 
 ///@cond
 extern const uint8_t template_for_device[];
@@ -287,50 +251,52 @@ public:
 
     explicit CompCertAccessor(const uint8_t* data) : _data(data)
     {
-        _issue_date  = get_issue_date();
-        _expire_date = get_expire_date();
+        if (_data) {
+            _issue_date  = get_issue_date();
+            _expire_date = get_expire_date();
+        }
     }
 
-    uint8_t format_version() const
+    inline uint8_t format_version() const
     {
         return _data[70] & 0x0F;
     }
-    uint8_t template_id() const
+    inline uint8_t template_id() const
     {
         return (_data[69] >> 4) & 0x0F;
     }
-    uint8_t chain_id() const
+    inline uint8_t chain_id() const
     {
         return _data[69] & 0x0F;
     }
-    uint8_t sn_source() const
+    inline uint8_t sn_source() const
     {
         return (_data[70] >> 4) & 0x0F;
     }
 
-    const uint8_t* signer_id() const
+    inline const uint8_t* signer_id() const
     {
         return _data + 67;
     }
 
-    const uint8_t* signature() const
+    inline const uint8_t* signature() const
     {
         return _data + 0;
     }
-    const uint8_t* signature_r() const
+    inline const uint8_t* signature_r() const
     {
         return _data + 0;
     }
-    const uint8_t* signature_s() const
+    inline const uint8_t* signature_s() const
     {
         return _data + 32;
     }
 
-    DateTime issue_date() const
+    inline DateTime issue_date() const
     {
         return _issue_date;
     }
-    DateTime expire_date() const
+    inline DateTime expire_date() const
     {
         return _expire_date;
     }
@@ -342,19 +308,18 @@ private:
     DateTime get_issue_date() const
     {
         DateTime dt{};
-        uint8_t b64 = _data[64];
-        uint8_t b65 = _data[65];
-        uint8_t b66 = _data[66];
-        uint8_t b71 = _data[71];
+        uint8_t b64     = _data[64];
+        uint8_t b65     = _data[65];
+        uint8_t b66     = _data[66];
+        uint8_t b71     = _data[71];
+        uint8_t fmt_ver = format_version();
 
-        uint8_t format_version = _data[70] & 0x0F;
-
-        if (format_version == 1 || format_version == 2) {
+        if (fmt_ver == 1 || fmt_ver == 2) {
             dt.tm_year = ((((b71 & 0xC0) >> 1) | ((b64 >> 3) & 0x1F)) + 100);
         } else {
             dt.tm_year = ((b64 >> 3) + 100);
         }
-        dt.tm_mon  = (((b64 & 0x07) << 1) | ((b65 & 0x80) >> 7)) - 1;  // 公式準拠で 0〜11
+        dt.tm_mon  = (((b64 & 0x07) << 1) | ((b65 & 0x80) >> 7)) - 1;
         dt.tm_mday = (b65 & 0x7C) >> 2;
         dt.tm_hour = ((b65 & 0x03) << 3) | ((b66 & 0xE0) >> 5);
         dt.tm_min  = 0;
@@ -364,14 +329,13 @@ private:
 
     DateTime get_expire_date() const
     {
-        DateTime dt = issue_date();
-        uint8_t b66 = _data[66];
-        uint8_t b71 = _data[71];
+        DateTime dt     = issue_date();
+        uint8_t b66     = _data[66];
+        uint8_t b71     = _data[71];
+        uint8_t fmt_ver = format_version();
+        uint8_t expire_years{};
 
-        uint8_t format_version = _data[70] & 0x0F;
-        uint8_t expire_years;
-
-        if (format_version == 1 || format_version == 2) {
+        if (fmt_ver == 1 || fmt_ver == 2) {
             expire_years = (b66 & 0x1F) | ((b71 & 0x30) << 1);
         } else {
             expire_years = b66 & 0x1F;
@@ -380,7 +344,7 @@ private:
         if (expire_years != 0) {
             dt.tm_year += expire_years;
         } else {
-            // 無期限
+            // indefinite
             dt.tm_year = 9999 - 1900;
             dt.tm_mon  = 11;
             dt.tm_mday = 31;

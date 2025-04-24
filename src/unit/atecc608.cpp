@@ -8,7 +8,7 @@
   @brief ATECC608 definition
 */
 #include "atecc608.hpp"
-#include <M5Unified.h>
+#include "utility/base64.hpp"
 #include <M5Utility.h>
 
 namespace {
@@ -83,64 +83,6 @@ constexpr uint8_t template_for_signer[] = {
 constexpr uint32_t template_for_device_size{sizeof(template_for_device)};
 constexpr uint32_t template_for_signer_size{sizeof(template_for_signer)};
 
-constexpr char b64_table_std[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-constexpr char b64_table_url[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
-uint32_t encode_base64(char* out, const uint32_t olen, const uint8_t* buf, const uint32_t blen, const uint8_t line_len,
-                       const bool urlEncode, const bool padding)
-{
-    const char* b64_table = urlEncode ? b64_table_url : b64_table_std;
-
-    if (!out || !olen || !buf || !blen) {
-        return 0;
-    }
-
-    uint32_t written  = 0;
-    uint32_t line_pos = 0;
-
-    for (uint32_t i = 0; i < blen; i += 3) {
-        uint32_t val    = (buf[i] << 16);
-        bool has_second = (i + 1 < blen);
-        bool has_third  = (i + 2 < blen);
-        if (has_second) val |= (buf[i + 1] << 8);
-        if (has_third) val |= buf[i + 2];
-
-        if (written + 4 >= olen) {
-            return 0;
-        }
-
-        out[written++] = b64_table[(val >> 18) & 0x3F];
-        out[written++] = b64_table[(val >> 12) & 0x3F];
-        out[written++] = has_second ? b64_table[(val >> 6) & 0x3F] : (padding ? '=' : '\0');
-        out[written++] = has_third ? b64_table[val & 0x3F] : (padding ? '=' : '\0');
-
-        if (!has_second && !padding) written--;
-        if (!has_third && !padding) written--;
-
-        line_pos += 4;
-        if (line_len > 0 && line_pos >= line_len && !urlEncode) {
-            if (written + 1 >= olen) {
-                return 0;
-            }
-            out[written++] = '\n';
-            line_pos       = 0;
-        }
-    }
-
-    if (line_len > 0 && line_pos > 0 && !urlEncode) {
-        if (written + 1 >= olen) {
-            return 0;
-        }
-        out[written++] = '\n';
-    }
-
-    if (written < olen) {
-        out[written] = '\0';
-    }
-
-    return written;
-}
-
 bool convertToPEM(char* out, const uint32_t olen, const uint8_t* der, uint32_t dlen, const char* header,
                   const char* footer)
 {
@@ -148,49 +90,33 @@ bool convertToPEM(char* out, const uint32_t olen, const uint8_t* der, uint32_t d
         return false;
     }
 
-    // 実際に必要なサイズを計算
+    // Calculate required size
     const uint32_t base64_len        = ((dlen + 2) / 3) * 4;
-    const uint32_t line_breaks       = (base64_len + 63) / 64;  // 毎64文字で改行
+    const uint32_t line_breaks       = (base64_len + 63) / 64;
     const uint32_t total_b64_out_len = base64_len + line_breaks;
 
     const uint32_t needed = strlen("-----BEGIN -----\n") + strlen(header) + total_b64_out_len +
                             strlen("-----END -----\n") + strlen(footer) + 1;  // '\0'
-
     if (needed > olen) {
         return false;
     }
 
-    uint32_t written = 0;
-
-    // 先頭のヘッダー行
+    uint32_t written{};
+    // heaader
     written += snprintf(out + written, olen - written, "-----BEGIN %s-----\n", header);
-
-    // Base64エンコード本体
-    uint32_t b64_written = encode_base64(out + written, olen - written, der, dlen, 64, false, true);
+    // body
+    uint32_t b64_written = m5::utility::encode_base64(out + written, olen - written, der, dlen, 64, false, true);
     if (b64_written == 0) {
         return false;
     }
     written += b64_written;
-
-    // フッター行
+    // footer
     written += snprintf(out + written, olen - written, "-----END %s-----\n", footer);
-
-    // 明示的にnull終端
+    // terminate
     if (written < olen) {
         out[written] = '\0';
     }
-
     return true;
-}
-
-void printPEM(const uint8_t* der, const uint32_t dlen, const char* header, const char* footer)
-{
-    char buf[1024]{};
-    if (convertToPEM(buf, sizeof(buf), der, dlen, header, footer)) {
-        M5.Log.printf(buf);
-    } else {
-        M5_LIB_LOGE("Failed to convert PEM");
-    }
 }
 
 }  // namespace atecc608

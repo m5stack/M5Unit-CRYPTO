@@ -18,17 +18,20 @@ using m5::unit::types::elapsed_time_t;
 
 namespace {
 constexpr std::array<uint8_t, 4> RESPONSE{0x04, 0x11, 0x33, 0x43};
-constexpr uint8_t fixed_nonce_mode_table[]     = {NONCE_MODE_TARGET_TEMPKEY, NONCE_MODE_TARGET_DIGEST,
+constexpr uint8_t fixed_nonce_mode_table32[]   = {NONCE_MODE_TARGET_TEMPKEY, NONCE_MODE_TARGET_DIGEST,
                                                   NONCE_MODE_TARGET_ALTKEY, 0xFF};
+constexpr uint8_t fixed_nonce_mode_table64[]   = {NONCE_MODE_TARGET_TEMPKEY, NONCE_MODE_TARGET_DIGEST, 0xFF, 0xFF};
 constexpr uint8_t finalize_sha256_mode_table[] = {SHA_MODE_OUTPUT_TEMPKEY, SHA_MODE_OUTPUT_DIGEST, 0xFF,
                                                   SHA_MODE_OUTPUT_BUFFER};
 constexpr uint8_t sign_source_table[]          = {SIGN_MODE_TEMPKEY, SIGN_MODE_DIGEST, 0xFF, 0xFF};
 constexpr uint8_t verify_source_table[]        = {SIGN_MODE_TEMPKEY, SIGN_MODE_DIGEST, 0xFF, 0xFF};
 
+const uint8_t otp_608b[] = {};
+
 // CRC16
 m5::utility::CRC16 crc16(0x0000, 0x8005, true, false, 0x0000);
 
-inline bool delay_true(const uint32_t ms)
+inline bool delay_true(const uint32_t ms = 1)
 {
     m5::utility::delay(ms);
     return true;  // Always!
@@ -49,17 +52,25 @@ bool UnitATECC608B::begin()
         M5_LIB_LOGE("Failed to wakeup");
         return false;
     }
-
-    uint8_t revision[4]{};
-    if (!readRevision(revision)) {
+    if (!readRevision(_revision.data())) {
         M5_LIB_LOGE("Failed to readRevision");
         return false;
     }
-    /*
-    if(!is_valid_revision(revision)) {
+    if (!begin_impl()) {
+        M5_LIB_LOGE("Failed to begin_impl");
+        return false;
     }
-    */
     return !_cfg.idle ? sleep() : true;
+}
+
+bool UnitATECC608B::begin_impl()
+{
+    // Check 608B
+    if (!(_revision[0] == 0x00 && _revision[1] == 0x00 && _revision[2] == 0x60 && _revision[3] >= 0x03)) {
+        M5_LIB_LOGE("This is not 608B %02X:%02X:%02X:%02X", _revision[0], _revision[1], _revision[2], _revision[3]);
+        return false;
+    }
+    return true;
 }
 
 bool UnitATECC608B::wakeup()
@@ -93,12 +104,12 @@ bool UnitATECC608B::wakeup()
 
 bool UnitATECC608B::sleep()
 {
-    return writeWithTransaction(&WORD_ADRESS_VALUE_SLEEP, 1) == m5::hal::error::error_t::OK && delay_true(1);
+    return writeWithTransaction(&WORD_ADRESS_VALUE_SLEEP, 1) == m5::hal::error::error_t::OK && delay_true();
 }
 
 bool UnitATECC608B::idle()
 {
-    return writeWithTransaction(&WORD_ADRESS_VALUE_IDLE, 1) == m5::hal::error::error_t::OK && delay_true(1);
+    return writeWithTransaction(&WORD_ADRESS_VALUE_IDLE, 1) == m5::hal::error::error_t::OK && delay_true();
 }
 
 bool UnitATECC608B::readRevision(uint8_t data[4])
@@ -148,7 +159,7 @@ bool UnitATECC608B::readDeviceState(uint16_t& state)
         m5::utility::delay(DELAY_INFO);
         uint8_t rbuf[2]{};
         ok    = receive_response(rbuf, sizeof(rbuf));
-        state = rbuf[0] | (rbuf[1] << 8);
+        state = (rbuf[0] << 8) | (rbuf[1] << 0);
     }
     return idle() && ok;
 }
@@ -322,10 +333,9 @@ bool UnitATECC608B::selfTest(uint8_t resultBits, const uint8_t testBits)
     return idle() && ok;
 }
 
-bool UnitATECC608B::createNonce(const Destination dest, uint8_t output[32], const uint8_t input[20], const bool useRNG,
-                                const bool updateSeed)
+bool UnitATECC608B::createNonce(uint8_t output[32], const uint8_t input[20], const bool useRNG, const bool updateSeed)
 {
-    if (!input || !wakeup() || (dest != Destination::TempKey && dest != Destination::MsgDigestBuffer)) {
+    if (!input || !wakeup()) {
         return false;
     }
     if (output) {
@@ -334,8 +344,13 @@ bool UnitATECC608B::createNonce(const Destination dest, uint8_t output[32], cons
 
     bool ok{};
     uint8_t buf[32]{};
-    if (send_command(OPCODE_NONCE, updateSeed ? NONCE_MODE_RANDOM_UPDATE_SEED : NONCE_MODE_RANDOM_NOT_UPDATE_SEED,
-                     useRNG ? NONCE_USE_TRNG : NONCE_USE_TEMPKEY, input, 20)) {
+
+    const uint8_t mode    = (updateSeed ? NONCE_MODE_RANDOM_UPDATE_SEED : NONCE_MODE_RANDOM_NOT_UPDATE_SEED);
+    const uint16_t param2 = (useRNG ? NONCE_USE_TRNG : NONCE_USE_TEMPKEY);
+
+    M5_LIB_LOGE("createNonec:%02X, %04X", mode, param2);
+
+    if (send_command(OPCODE_NONCE, mode, param2, input, 20)) {
         m5::utility::delay(DELAY_NONCE);
         ok = receive_response(output ? output : buf, 32);
     }
@@ -344,13 +359,17 @@ bool UnitATECC608B::createNonce(const Destination dest, uint8_t output[32], cons
 
 bool UnitATECC608B::write_nonce(const Destination dest, const uint8_t* input, const uint32_t ilen)
 {
-    uint8_t mode = fixed_nonce_mode_table[m5::stl::to_underlying(dest)] | NONCE_MODE_PASSTHROUGH |
-                   ((ilen > 32) ? NONCE_MODE_INPUT_64 : 0x00);
+    const uint8_t* tbl = ilen > 32 ? fixed_nonce_mode_table64 : fixed_nonce_mode_table32;
+    uint8_t mode =
+        tbl[m5::stl::to_underlying(dest)] | NONCE_MODE_PASSTHROUGH | ((ilen > 32) ? NONCE_MODE_INPUT_64 : 0x00);
     if (mode == 0xFF || !input || ilen < 32 || !wakeup()) {
         return false;
     }
 
     bool ok{};
+
+    M5_LIB_LOGE("writeNoncee%u:%02X %04X", ilen, mode, 0x0000);
+
     if (send_command(OPCODE_NONCE, mode, 0x0000, input, ilen)) {
         m5::utility::delay(DELAY_NONCE);
         uint8_t status{};
@@ -368,17 +387,16 @@ bool UnitATECC608B::generateKey(uint8_t pubKey[64])
     return pubKey && generate_key(pubKey, GENKEY_MODE_PRIVATE, 0xFFFF, wbuf, 3);
 }
 
-bool UnitATECC608B::generatePublicKeyDigest(const atecc608::Slot slot)
+bool UnitATECC608B::generatePublicKeyDigest(const atecc608::Slot slot, const uint8_t otherData[3])
 {
-    uint8_t buf[3]{};
-    return generate_key(nullptr, GENKEY_MODE_PUBLIC_DIGEST, m5::stl::to_underlying(slot), buf, sizeof(buf));
+    return generate_key(nullptr, GENKEY_MODE_PUBLIC_DIGEST, m5::stl::to_underlying(slot), otherData, otherData ? 3 : 0);
 }
 
 bool UnitATECC608B::generate_key(uint8_t pubKey[64], const uint8_t mode, const uint16_t param2, const uint8_t* data,
                                  const uint32_t dlen)
 {
     bool ok{};
-    if (wakeup() && send_command(OPCODE_GENKEY, mode, param2, data, dlen)) {
+    if (wakeup() && delay_true(2) && send_command(OPCODE_GENKEY, mode, param2, data, dlen)) {
         m5::utility::delay(DELAY_GENKEY);
         if (pubKey) {
             ok = receive_response(pubKey, 64);
@@ -423,7 +441,12 @@ bool UnitATECC608B::startSHA256()
 
 bool UnitATECC608B::updateSHA256(const uint8_t* msg, const uint32_t mlen)
 {
-    if (!msg || !mlen || !wakeup()) {
+    // No change context
+    if (!msg || !mlen) {
+        M5_LIB_LOGW("msg is empty");
+        return true;
+    }
+    if (!wakeup()) {
         return false;
     }
 
@@ -431,6 +454,8 @@ bool UnitATECC608B::updateSHA256(const uint8_t* msg, const uint32_t mlen)
     uint32_t remaining = mlen;
     const uint8_t* ptr = msg;
     bool ok{true};
+
+    auto idle_wakeup_at = m5::utility::millis() + 1000;
 
     while (remaining > 0) {
         uint16_t chunk_size = (remaining >= BLOCK_SIZE) ? BLOCK_SIZE : remaining;
@@ -449,6 +474,16 @@ bool UnitATECC608B::updateSHA256(const uint8_t* msg, const uint32_t mlen)
 
         ptr += chunk_size;
         remaining -= chunk_size;
+
+        // When long data comes in, WDT causes 0xEE error, so to prevent this, idle -> wakeup transition is used
+        auto now = m5::utility::millis();
+        if (now > idle_wakeup_at) {
+            if (!idle() || !wakeup()) {
+                ok = false;
+                break;
+            }
+            idle_wakeup_at = now + 1000;
+        }
     }
     return idle() && ok;
 }
@@ -466,6 +501,57 @@ bool UnitATECC608B::finalizeSHA256(const atecc608::Destination dest, uint8_t dig
     if (send_command(OPCODE_SHA, mode)) {
         m5::utility::delay(DELAY_SHA);
         ok = receive_response(digest, 32);
+    }
+    return idle() && ok;
+}
+
+bool UnitATECC608B::ecdh_receive32(uint8_t out[32], const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64])
+{
+    if (!out || !pubKey || !wakeup()) {
+        return false;
+    }
+    memset(out, 0, 32);
+
+    bool ok{};
+    if (send_command(OPCODE_ECDH, mode, param2, pubKey, 64)) {
+        m5::utility::delay(DELAY_ECDH);
+        ok = receive_response(out, 32);
+    }
+    return idle() && ok;
+}
+
+bool UnitATECC608B::ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t mode, const uint16_t param2,
+                                     const uint8_t pubKey[64])
+{
+    if (!out || !nonce || !pubKey || !wakeup()) {
+        return false;
+    }
+    memset(out, 0, 32);
+    memset(nonce, 0, 32);
+
+    bool ok{};
+    if (send_command(OPCODE_ECDH, mode, param2, pubKey, 64)) {
+        m5::utility::delay(DELAY_ECDH);
+        uint8_t buf[64]{};
+        ok = receive_response(buf, 64);
+        if (ok) {
+            memcpy(out, buf, 32);
+            memcpy(nonce, buf + 32, 32);
+        }
+    }
+    return idle() && ok;
+}
+
+bool UnitATECC608B::ecdh_no_output(const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64])
+{
+    bool ok{};
+    if (!pubKey || !wakeup()) {
+        return false;
+    }
+    if (send_command(OPCODE_ECDH, mode, param2, pubKey, 64)) {
+        m5::utility::delay(DELAY_ECDH);
+        uint8_t status{};
+        ok = receive_response(&status, 1) && (status == 0);
     }
     return idle() && ok;
 }
@@ -494,11 +580,10 @@ bool UnitATECC608B::verify(uint8_t mac[32], const uint8_t mode, const uint16_t p
             memcpy(data + 64, pubKey, 64);
         }
 
-        M5_LIB_LOGE(">>>>> %02X %04X %p %u / %u", mode, param2, data, pubKey ? 128 : 64, response_size);
+        // M5_LIB_LOGE(">>>>> %02X %04X %p %u / %u", mode, param2, data, pubKey ? 128 : 64, response_size);
 
         if (send_command(OPCODE_VERIFY, mode | smode, param2, data, pubKey ? 128 : 64)) {
-            // m5::utility::delay(DELAY_VERIFY);
-            m5::utility::delay(200);
+            m5::utility::delay(DELAY_VERIFY);
 
             if (receive_response(response, response_size)) {
                 ok = true;
@@ -579,20 +664,16 @@ bool UnitATECC608B::receive_response(uint8_t* data, const uint32_t dlen)
         return false;
     }
 
-    // Error packet? (length == 4)
-    if (count == 4) {
-        const uint8_t status = rbuf[1];
-        if (status) {
-            M5_LIB_LOGE("Device returned error: %02X", status);
-        }
-        return status == 0x00;
-    }
-    const auto clen = std::min(count - 3, dlen);
-
+    // Any response data or status
+    const auto clen = std::min(count - 3 /* count , crc16 */, dlen);
     // M5_LIB_LOGD("R>>> count:%u out:%u clen:%u", count, dlen, clen);
-
     memcpy(data, rbuf + 1, clen);
-    return true;
+
+    if (clen == 1 && data[0] != 0) {
+        M5_LIB_LOGE("Receive error: %02X", data[0]);
+    }
+
+    return (clen > 1) || (data[0] == 0);
 }
 
 bool UnitATECC608B::read_data(uint8_t* rbuf, const uint32_t rlen, const uint8_t zone, const uint16_t address,
@@ -600,8 +681,9 @@ bool UnitATECC608B::read_data(uint8_t* rbuf, const uint32_t rlen, const uint8_t 
 {
     if (send_command(OPCODE_READ, zone | ((rlen > 4) ? 0x80 : 0x00), address)) {
         m5::utility::delay(delayMs);
-        return receive_response(rbuf, rlen) && delay_true(1);  // post delay
+        return receive_response(rbuf, rlen) && delay_true();  // post delay
     }
+    M5_LIB_LOGE("Failed send_command:%02X %04X", zone | ((rlen > 4) ? 0x80 : 0x00), address);
     return false;
 }
 
@@ -615,54 +697,6 @@ bool UnitATECC608B::read_slot_config_word(uint16_t& cfg, const uint8_t baseOffse
     bool ok = wakeup() && read_data(v, sizeof(v), ZONE_CONFIG, offset_to_param2_for_config(offset));
     if (ok) {
         cfg = (v[idx] << 8) | v[idx + 1];  // BE
-    }
-    return idle() && ok;
-}
-
-bool UnitATECC608B::ecdh_receive32(uint8_t out[32], const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2)
-{
-    if (!out || !pubKey || !wakeup()) {
-        return false;
-    }
-    memset(out, 0, 32);
-
-    bool ok{};
-    if (send_command(OPCODE_ECDH, mode, param2, pubKey, 64)) {
-        m5::utility::delay(DELAY_ECDH);
-        ok = receive_response(out, 32);
-    }
-    return idle() && ok;
-}
-
-bool UnitATECC608B::ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64], const uint8_t mode,
-                                     const uint16_t param2)
-{
-    if (!out || !nonce || !pubKey || !wakeup()) {
-        return false;
-    }
-    memset(out, 0, 32);
-    memset(nonce, 0, 32);
-
-    bool ok{};
-    if (send_command(OPCODE_ECDH, mode, param2, pubKey, 64)) {
-        m5::utility::delay(DELAY_ECDH);
-        uint8_t buf[64]{};
-        ok = receive_response(buf, 64);
-        if (ok) {
-            memcpy(out, buf, 32);
-            memcpy(nonce, buf + 32, 32);
-        }
-    }
-    return idle() && ok;
-}
-
-bool UnitATECC608B::ecdh_no_output(const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2)
-{
-    bool ok{};
-    if (pubKey && wakeup() && send_command(OPCODE_ECDH, mode, param2, pubKey, 64)) {
-        m5::utility::delay(DELAY_ECDH);
-        uint8_t status{};
-        ok = receive_response(&status, 1) && (status == 0);
     }
     return idle() && ok;
 }

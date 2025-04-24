@@ -17,12 +17,32 @@ using namespace m5::unit::atecc608;
 using m5::unit::types::elapsed_time_t;
 
 namespace {
+constexpr uint8_t otp_608b_tngtls[] = {0x78, 0x36, 0x74, 0x6A, 0x75, 0x5A, 0x4D, 0x79, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+inline bool is_ecdh_source_slot(const uint8_t m)
+{
+    constexpr uint8_t mask = ECDH_MODE_SRC_SLOT | ECDH_MODE_SRC_TEMPKEY;
+    return (m & mask) == ECDH_MODE_SRC_SLOT;
+}
 
 bool is_valid_ecdh_slot(const uint16_t slot)
 {
     if (!(slot == 0 || (slot >= 2 && slot <= 4))) {
         M5_LIB_LOGE("For TNGTLS, the ECDH command may be run using the ECC private keys stored in Slots 0 and 2-4 (%u)",
                     slot);
+        return false;
+    }
+    return true;
+}
+
+bool is_valid_ecdh_output_slot(const uint16_t slot)
+{
+    if (!(slot == 8)) {
+        M5_LIB_LOGE("For TNGTLS, ECDH command output slot only 8 (%u)", slot);
         return false;
     }
     return true;
@@ -50,7 +70,16 @@ bool is_valid_genkey_public_digest(const uint16_t slot)
 bool is_valid_sign_external_slot(const uint16_t slot)
 {
     if (!(slot == 0 || (slot >= 2 && slot <= 4))) {
-        M5_LIB_LOGE("For TNGTLS device, Slots 0 and 2-4 are enabled to sign external messages (%u)", slot);
+        M5_LIB_LOGE("For TNGTLS, Slots 0 and 2-4 are enabled to sign external messages (%u)", slot);
+        return false;
+    }
+    return true;
+}
+
+bool is_valid_sign_internal_slot(const uint16_t slot)
+{
+    if (!(slot == 1)) {
+        M5_LIB_LOGE("For TNGTLS, only Slot 1 is capable of signing internally generated messages (%u)", slot);
         return false;
     }
     return true;
@@ -204,6 +233,20 @@ const char UnitATECC608B_TNGTLS::name[] = "UnitATECC608B_TNGTLS";
 const types::uid_t UnitATECC608B_TNGTLS::uid{"UnitATECC608B_TNGTLS"_mmh3};
 const types::attr_t UnitATECC608B_TNGTLS::attr{0};
 
+bool UnitATECC608B_TNGTLS::begin_impl()
+{
+    uint8_t otp[64]{};
+    // Check 608BTNGTLS
+    const uint8_t* rev = revision();
+    if (!(rev[0] == 0x00 && rev[1] == 0x00 && rev[2] == 0x60 && rev[3] >= 0x03 && readOTPZone(otp) &&
+          memcmp(otp, otp_608b_tngtls, 64) == 0)) {
+        M5_LIB_LOGE("This is not 608BTNGTLS %02X:%02X:%02X:%02X", rev[0], rev[1], rev[2], rev[3]);
+        M5_DUMPE(otp, 64);
+        return false;
+    }
+    return true;
+}
+
 bool UnitATECC608B_TNGTLS::readDeviceCertificate(uint8_t* out, uint16_t& olen, const bool fillAuthKeyId)
 {
     constexpr uint16_t offset_cert_sn{15};
@@ -298,7 +341,7 @@ bool UnitATECC608B_TNGTLS::readDeviceCertificate(uint8_t* out, uint16_t& olen, c
     uint8_t cert_sn[32]{};
     memcpy(msg, pubKey, 64);
     memcpy(msg + 64, ccert + 64, 3);  // Add encoded dates from compressed certificate
-    if (!SHA256(Destination::OutputBuffer, cert_sn, msg, sizeof(msg))) {
+    if (!SHA256(Destination::ExternalBuffer, cert_sn, msg, sizeof(msg))) {
         M5_LIB_LOGE("Failed to SHA256");
         return false;
     }
@@ -424,7 +467,7 @@ bool UnitATECC608B_TNGTLS::readSignerCertificate(uint8_t* out, uint16_t& olen)
     uint8_t cert_sn[32]{};
     memcpy(msg, pubKey, 64);
     memcpy(msg + 64, ccert + 64, 3);
-    if (!SHA256(Destination::OutputBuffer, cert_sn, msg, sizeof(msg))) {
+    if (!SHA256(Destination::ExternalBuffer, cert_sn, msg, sizeof(msg))) {
         M5_LIB_LOGE("Failed to SHA256");
         return false;
     }
@@ -442,37 +485,41 @@ bool UnitATECC608B_TNGTLS::readSignerCertificate(uint8_t* out, uint16_t& olen)
     return true;
 }
 
-bool UnitATECC608B_TNGTLS::ecdh_receive32(uint8_t out[32], const uint8_t pubKey[64], const uint8_t mode,
-                                          const uint16_t param2)
+bool UnitATECC608B_TNGTLS::ecdh_receive32(uint8_t out[32], const uint8_t mode, const uint16_t param2,
+                                          const uint8_t pubKey[64])
 {
-    if ((mode & ECDH_MODE_SRC_SLOT) && !is_valid_ecdh_slot(param2)) {
+    if (is_ecdh_source_slot(mode) && !is_valid_ecdh_slot(param2)) {
         return false;
     }
-    return UnitATECC608B::ecdh_receive32(out, pubKey, mode, param2);
+    return UnitATECC608B::ecdh_receive32(out, mode, param2, pubKey);
 }
 
-bool UnitATECC608B_TNGTLS::ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64],
-                                            const uint8_t mode, const uint16_t param2)
+bool UnitATECC608B_TNGTLS::ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t mode,
+                                            const uint16_t param2, const uint8_t pubKey[64])
 {
-    if ((mode & ECDH_MODE_SRC_SLOT) && !is_valid_ecdh_slot(param2)) {
+    if (is_ecdh_source_slot(mode) && !is_valid_ecdh_slot(param2)) {
         return false;
     }
-    return UnitATECC608B::ecdh_receive32x2(out, nonce, pubKey, mode, param2);
+    return UnitATECC608B::ecdh_receive32x2(out, nonce, mode, param2, pubKey);
 }
 
-bool UnitATECC608B_TNGTLS::ecdh_no_output(const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2)
+bool UnitATECC608B_TNGTLS::ecdh_no_output(const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64])
 {
-    if ((mode & ECDH_MODE_SRC_SLOT) && !is_valid_ecdh_slot(param2)) {
+    if (is_ecdh_source_slot(mode) && !is_valid_ecdh_slot(param2)) {
         return false;
     }
-    return ecdh_no_output(pubKey, mode, param2);
+    if ((mode & ECDH_MODE_OUTPUT_SLOT) && !is_valid_ecdh_output_slot(param2)) {
+        return false;
+    }
+
+    return UnitATECC608B::ecdh_no_output(mode, param2, pubKey);
 }
 
 bool UnitATECC608B_TNGTLS::generate_key(uint8_t pubKey[64], const uint8_t mode, const uint16_t param2,
                                         const uint8_t* data, const uint32_t dlen)
 {
-    if (((mode & GENKEY_MODE_PRIVATE) && !is_valid_genkey_private_slot(param2)) ||
-        (mode & GENKEY_MODE_PUBLIC_DIGEST) && !is_valid_genkey_public_digest(param2)) {
+    if ((((mode & GENKEY_MODE_PRIVATE) && param2 != 0xFFFF) && !is_valid_genkey_private_slot(param2)) ||
+        ((mode & GENKEY_MODE_PUBLIC_DIGEST) && !is_valid_genkey_public_digest(param2))) {
         return false;
     }
     return UnitATECC608B::generate_key(pubKey, mode, param2, data, dlen);
@@ -481,7 +528,8 @@ bool UnitATECC608B_TNGTLS::generate_key(uint8_t pubKey[64], const uint8_t mode, 
 bool UnitATECC608B_TNGTLS::sign(uint8_t signature[64], const uint8_t mode, const uint16_t param2,
                                 const atecc608::Source src)
 {
-    if ((mode & SIGN_MODE_EXTERNAL) && !is_valid_sign_external_slot(param2)) {
+    if (((mode & SIGN_MODE_EXTERNAL) && !is_valid_sign_external_slot(param2)) ||
+        (((mode & ~(SIGN_MODE_INCLUDE_SN)) == 0x00) && !is_valid_sign_internal_slot(param2))) {
         return false;
     }
     return UnitATECC608B::sign(signature, mode, param2, src);

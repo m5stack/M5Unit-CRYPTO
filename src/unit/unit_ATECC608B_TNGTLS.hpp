@@ -50,11 +50,14 @@ public:
     ///@}
 
 protected:
-    virtual bool ecdh_receive32(uint8_t out[32], const uint8_t pubKey[64], const uint8_t mode,
-                                const uint16_t param2) override;
-    virtual bool ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64], const uint8_t mode,
-                                  const uint16_t param2) override;
-    virtual bool ecdh_no_output(const uint8_t pubKey[64], const uint8_t mode, const uint16_t param2) override;
+    virtual bool begin_impl() override;
+
+    virtual bool ecdh_receive32(uint8_t out[32], const uint8_t mode, const uint16_t param2,
+                                const uint8_t pubKey[64]) override;
+    virtual bool ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t mode, const uint16_t param2,
+                                  const uint8_t pubKey[64]) override;
+    virtual bool ecdh_no_output(const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64]) override;
+
     virtual bool generate_key(uint8_t pubKey[64], const uint8_t mode, const uint16_t param2 = 0x0000,
                               const uint8_t* data = nullptr, const uint32_t dlen = 0) override;
     virtual bool sign(uint8_t signature[64], const uint8_t mode, const uint16_t param2,
