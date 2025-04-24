@@ -791,7 +791,7 @@ TEST_P(TestATECC608B_TNGTLS, SignExternal)
     SCOPED_TRACE(ustr);
 
     uint16_t state{};
-    uint8_t signature[32]{};
+    uint8_t signature[64]{};
     const uint8_t digest[32] = {0xF0, 0xE1, 0xD2, 0xC3, 0xB4, 0xA5, 0x96, 0x87, 0x78, 0x69, 0x5A,
                                 0x4B, 0x3C, 0x2D, 0x1E, 0x0F, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
                                 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
@@ -851,7 +851,7 @@ TEST_P(TestATECC608B_TNGTLS, SignInternal)
     SCOPED_TRACE(ustr);
 
     uint16_t state{};
-    uint8_t signature[32]{};
+    uint8_t signature[64]{};
     uint8_t pubKey[64]{};
 
     EXPECT_TRUE(clear_tempkey(unit.get()));
@@ -863,6 +863,7 @@ TEST_P(TestATECC608B_TNGTLS, SignInternal)
         EXPECT_FALSE(unit->signInternal(signature, (Slot)s, Source::MsgDigestBuffer, false));
         EXPECT_FALSE(unit->signInternal(signature, (Slot)s, Source::AlternateKeyBuffer, false));
         EXPECT_FALSE(unit->signInternal(signature, (Slot)s, Source::ExternalBuffer, false));
+
         EXPECT_FALSE(unit->signInternal(signature, (Slot)s, Source::TempKey, true));
         EXPECT_FALSE(unit->signInternal(signature, (Slot)s, Source::MsgDigestBuffer, true));
         EXPECT_FALSE(unit->signInternal(signature, (Slot)s, Source::AlternateKeyBuffer, true));
@@ -870,38 +871,10 @@ TEST_P(TestATECC608B_TNGTLS, SignInternal)
     }
 
     // Failed because illegal TempKey (TempKey need to made by GenDlg, GenKey)
-    const uint8_t nin[2]{};
+    const uint8_t nin[20]{};
     EXPECT_TRUE(unit->createNonce(nullptr, nin));
     EXPECT_TRUE(unit->readDeviceState(state));
     EXPECT_TRUE(is_valid_tempkey(state));
     EXPECT_FALSE(is_external_source_tempkey(state));
     EXPECT_FALSE(unit->signInternal(signature, (Slot)1, Source::TempKey));
-
-#if 0    
-    // Source TempKey
-    for (uint8_t s = 1; s < 2; ++s) {
-        M5_LOGW(">>>> %u", s);
-
-        //        EXPECT_TRUE(unit->generatePublicKeyDigest(Slot::SignerPublicKey));
-        EXPECT_TRUE(unit->generateKey(pubKey));
-        if (s == 1) {
-            EXPECT_TRUE(unit->signInternal(signature, (Slot)s, Source::TempKey, false));
-        } else {
-            EXPECT_FALSE(unit->signInternal(signature, (Slot)s, Source::TempKey, false));
-        }
-
-#if 0        
-        M5_LOGI("----");
-
-        EXPECT_TRUE(unit->generatePublicKeyDigest(Slot::SignerPublicKey));
-        if (s == 1) {
-            EXPECT_TRUE(unit->signInternal(signature, (Slot)s, Source::TempKey, true));
-        } else {
-            EXPECT_FALSE(unit->signInternal(signature, (Slot)s, Source::TempKey, true));
-        }
-#endif
-        M5_LOGW("<<<<");
-    }
-#endif
-    // Source MsgDigestBuffer
 }
