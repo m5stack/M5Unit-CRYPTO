@@ -165,9 +165,53 @@ constexpr Sha256TestVector sha256_test_vectors[] = {
 constexpr uint8_t sha256_a1000000_result[] = {0xCD, 0xC7, 0x6E, 0x5C, 0x99, 0x14, 0xFB, 0x92, 0x81, 0xA1, 0xC7,
                                               0xE2, 0x84, 0xD7, 0x3E, 0x67, 0xF1, 0x80, 0x9A, 0x48, 0xA4, 0x97,
                                               0x20, 0x0E, 0x04, 0x6D, 0x39, 0xCC, 0xC7, 0x11, 0x2C, 0xD0};
+
+template <typename T, typename U>
+void test_random(UnitATECC608B_TNGTLS* u, const U l, const U h)
+{
+    const T lower  = static_cast<T>(l);
+    const T higher = static_cast<T>(h);
+
+    uint32_t count{100};
+    std::vector<T> result;
+
+    while (count--) {
+        T value{};
+        EXPECT_TRUE(u->readRandom(value, lower, higher));  // [lower ... higher)
+
+        EXPECT_LT(value, higher);
+        EXPECT_GE(value, lower);
+        result.push_back(value);
+    }
+    EXPECT_EQ(result.size(), 100);
+    EXPECT_FALSE(std::all_of(result.cbegin() + 1, result.cend(), [&result](const uint8_t v) { return v == result[0]; }))
+        << "low:" << l << " high:" << h;
+}
+
+template <typename T, typename U>
+void test_random_float(UnitATECC608B_TNGTLS* u, const U l, const U h)
+{
+    const T lower  = static_cast<T>(l);
+    const T higher = static_cast<T>(h);
+
+    uint32_t count{100};
+    std::vector<T> result;
+
+    while (count--) {
+        T value{};
+        EXPECT_TRUE(u->readRandom(value, lower, higher));  // [lower ... higher)
+
+        EXPECT_TRUE(value < higher) << "actual=" << value << ", expected=" << higher;
+        EXPECT_TRUE(value >= lower) << "actual=" << value << ", expected=" << higher;
+        result.push_back(value);
+    }
+    EXPECT_EQ(result.size(), 100);
+    EXPECT_FALSE(std::all_of(result.cbegin() + 1, result.cend(), [&result](const uint8_t v) { return v == result[0]; }))
+        << "low:" << l << " high:" << h;
+}
+
 }  // namespace
 
-#if 0
 TEST_P(TestATECC608B_TNGTLS, serialNumber)
 {
     SCOPED_TRACE(ustr);
@@ -230,11 +274,8 @@ TEST_P(TestATECC608B_TNGTLS, Info)
             }
         }
     }
-
 }
-#endif
 
-#if 0
 TEST_P(TestATECC608B_TNGTLS, Nonce)
 {
     uint16_t state{};
@@ -309,7 +350,6 @@ TEST_P(TestATECC608B_TNGTLS, Nonce)
     EXPECT_TRUE(clear_tempkey(unit.get()));
     EXPECT_FALSE(unit->writeNonce32(Destination::ExternalBuffer, nonce32));
 
-    
     // Write 64-byte nonce (TempKey)
     EXPECT_TRUE(clear_tempkey(unit.get()));
     EXPECT_TRUE(unit->writeNonce64(Destination::TempKey, nonce64));
@@ -328,53 +368,6 @@ TEST_P(TestATECC608B_TNGTLS, Nonce)
     EXPECT_FALSE(unit->writeNonce64(Destination::AlternateKeyBuffer, nonce64));
     EXPECT_FALSE(unit->writeNonce64(Destination::ExternalBuffer, nonce64));
 }
-
-namespace {
-template <typename T, typename U>
-void test_random(UnitATECC608B_TNGTLS* u, const U l, const U h)
-{
-    const T lower  = static_cast<T>(l);
-    const T higher = static_cast<T>(h);
-
-    uint32_t count{100};
-    std::vector<T> result;
-
-    while (count--) {
-        T value{};
-        EXPECT_TRUE(u->readRandom(value, lower, higher));  // [lower ... higher)
-
-        EXPECT_LT(value, higher);
-        EXPECT_GE(value, lower);
-        result.push_back(value);
-    }
-    EXPECT_EQ(result.size(), 100);
-    EXPECT_FALSE(std::all_of(result.cbegin() + 1, result.cend(), [&result](const uint8_t v) { return v == result[0]; }))
-        << "low:" << l << " high:" << h;
-}
-
-template <typename T, typename U>
-void test_random_float(UnitATECC608B_TNGTLS* u, const U l, const U h)
-{
-    const T lower  = static_cast<T>(l);
-    const T higher = static_cast<T>(h);
-
-    uint32_t count{100};
-    std::vector<T> result;
-
-    while (count--) {
-        T value{};
-        EXPECT_TRUE(u->readRandom(value, lower, higher));  // [lower ... higher)
-
-        EXPECT_TRUE(value < higher) << "actual=" << value << ", expected=" << higher;
-        EXPECT_TRUE(value >= lower) << "actual=" << value << ", expected=" << higher;
-        result.push_back(value);
-    }
-    EXPECT_EQ(result.size(), 100);
-    EXPECT_FALSE(std::all_of(result.cbegin() + 1, result.cend(), [&result](const uint8_t v) { return v == result[0]; }))
-        << "low:" << l << " high:" << h;
-}
-
-}  // namespace
 
 TEST_P(TestATECC608B_TNGTLS, Random)
 {
@@ -439,7 +432,7 @@ TEST_P(TestATECC608B_TNGTLS, Read)
     uint8_t data[416]{};
     for (uint8_t s = 0; s < 16; ++s) {
         // Can read as clear text
-        if (s==5 || s == 8 || s == 10 || s == 11 || s == 12) {
+        if (s == 5 || s == 8 || s == 10 || s == 11 || s == 12) {
             EXPECT_TRUE(unit->readDataZone(data, unit->getSlotSize((Slot)s), (Slot)s));
         } else {
             EXPECT_FALSE(unit->readDataZone(data, unit->getSlotSize((Slot)s), (Slot)s));
@@ -457,7 +450,7 @@ TEST_P(TestATECC608B_TNGTLS, SHA256)
     uint16_t state{};
 
     // 'a' String repeated 1000000 times
-   constexpr uint32_t ilen{1000000};
+    constexpr uint32_t ilen{1000000};
     //    uint8_t* in = (uint8_t*)malloc(1000000);
     uint8_t* in = nullptr;
     if (in) {
@@ -576,126 +569,6 @@ TEST_P(TestATECC608B_TNGTLS, SHA256)
 
     free(in);
 }
-#endif
-
-#if 0
-TEST_P(TestATECC608B_TNGTLS, ECDH)
-{
-    SCOPED_TRACE(ustr);
-
-    // Make private key at TempKey
-    uint8_t pubKey[64]{};
-    EXPECT_TRUE(unit->generateKey(pubKey);
-
-    // 2. ソフトウェア側で鍵ペア作成（OpenSSLや mbedTLS を使うが今回は固定ベクター）
-    const uint8_t software_privkey[32] = {
-        0xC5, 0xAA, 0x8D, 0x6A, 0x58, 0x3E, 0xE6, 0xCD,
-        0xB4, 0x64, 0x05, 0x69, 0x8C, 0xF1, 0x6B, 0x07,
-        0x60, 0x19, 0x9C, 0x17, 0x6D, 0x46, 0xA0, 0x8F,
-        0x77, 0xD7, 0x04, 0x2F, 0x7C, 0x43, 0x76, 0x30,
-    };
-    const uint8_t software_pubkey[64] = {
-        0x04,
-        0x3A, 0xD0, 0xFD, 0xF2, 0x8D, 0x73, 0x5A, 0x7B,
-        0x8F, 0x62, 0xB0, 0xF5, 0xE7, 0x3B, 0xCE, 0x44,
-        0xD3, 0x3E, 0xC2, 0x60, 0x30, 0xF7, 0x9C, 0x45,
-        0x2A, 0x3A, 0x90, 0x13, 0xD3, 0x41, 0x7E, 0x19,
-        0xF8, 0xB0, 0x68, 0x70, 0xDE, 0xA4, 0x02, 0x03,
-        0xD5, 0x67, 0x8A, 0x16, 0x7F, 0x9D, 0x0E, 0x5F,
-        0x5B, 0x35, 0xAD, 0x69, 0x65, 0x6C, 0x26, 0x60,
-        0x62, 0x30, 0x67, 0x26, 0x8B, 0x89, 0xE7, 0xAF
-    };
-
-    // 3. ATECC608B による ECDH
-    uint8_t shared_secret_atecc[32]{};
-    ASSERT_TRUE(atecc.ecdh(shared_secret_atecc, Slot::PrimaryPrivateKey, software_pubkey));
-
-    // 4. ソフト側でも同じ shared secret を生成（例：mbedTLSなどを想定、ここでは固定ベクターとの一致確認）
-    const uint8_t expected_shared[32] = {
-        0x6A, 0x27, 0x2B, 0x4F, 0x12, 0xC2, 0x88, 0xB3,
-        0x68, 0xA3, 0x2D, 0xD2, 0xFC, 0xD3, 0x66, 0x6A,
-        0x96, 0x6D, 0x69, 0x0C, 0x7C, 0xE9, 0xD6, 0x0A,
-        0x48, 0xAB, 0x4D, 0xA4, 0x23, 0xB3, 0xB5, 0x44,
-    };
-
-    EXPECT_EQ(memcmp(shared_secret_atecc, expected_shared, 32), 0) << "ECDH output mismatch!";
-}
-#endif
-
-#if 0
-typedef struct {
-    const char* name;
-    const uint8_t private_key[32];
-    const uint8_t public_key_x[32];
-    const uint8_t public_key_y[32];
-    const uint8_t expected_shared_secret[32];
-} ECDHTestVector;
-
-const ECDHTestVector ecdh_test_vectors[] = {
-    {"secp256r1 test vector 1",
-     {0x38, 0xf6, 0x5d, 0x6d, 0xce, 0x47, 0x67, 0x60, 0x44, 0xd5, 0x8c, 0xe5, 0x13, 0x95, 0x82, 0xd5,
-      0x68, 0xf6, 0x4b, 0xb1, 0x60, 0x98, 0xd1, 0x79, 0xdb, 0xab, 0x07, 0x74, 0x1d, 0xd5, 0xca, 0xf5},
-     {0x80, 0x9f, 0x04, 0x28, 0x9c, 0x64, 0x34, 0x8c, 0x01, 0x51, 0x5e, 0xb0, 0x3d, 0x5c, 0xe7, 0xac,
-      0x1a, 0x8c, 0xb9, 0x49, 0x8f, 0x5c, 0xaa, 0x50, 0x19, 0x7e, 0x58, 0xd4, 0x3a, 0x86, 0xa7, 0xae},
-     {0xb2, 0x9d, 0x84, 0xe8, 0x11, 0x19, 0x7f, 0x25, 0xeb, 0xa8, 0xf5, 0x19, 0x40, 0x92, 0xcb, 0x6f,
-      0xf4, 0x40, 0xe2, 0x6d, 0x44, 0x21, 0x01, 0x13, 0x72, 0x46, 0x1f, 0x57, 0x92, 0x71, 0xcd, 0xa3},
-     {0x05, 0x7d, 0x63, 0x60, 0x96, 0xcb, 0x80, 0xb6, 0x7a, 0x8c, 0x03, 0x8c, 0x89, 0x0e, 0x88, 0x7d,
-      0x1a, 0xdf, 0xa4, 0x19, 0x5e, 0x9b, 0x3c, 0xe2, 0x41, 0xc8, 0xa7, 0x78, 0xc5, 0x9c, 0xda, 0x67}}
-    // 他のベクターも同様に追加可能
-};
-
-TEST_P(TestATECC608B_TNGTLS, ECDH)
-{
-    auto& e = ecdh_test_vectors[0];
-
-    // 公開鍵の組み立て（x || y）
-    uint8_t pubkey[64];
-    memcpy(pubkey, e.public_key_x, 32);
-    memcpy(pubkey + 32, e.public_key_y, 32);
-
-    // TempKey に秘密鍵をセット
-    uint8_t key64[64]{};
-    memcpy(key64, e.private_key, 32);
-    EXPECT_TRUE(unit->writeNonce64(Destination::TempKey, key64));
-
-    // ECDH 実行
-    uint8_t out[32]{};
-    EXPECT_TRUE(unit->ECDHTempKey(out, pubkey));
-
-    // 結果照合
-    EXPECT_EQ(memcmp(out, e.expected_shared_secret, 32), 0) << e.name;
-}
-
-
-TEST_P(TestATECC608B_TNGTLS, ECDH)
-{
-    SCOPED_TRACE(ustr);
-
-    // StoredKey
-    uint8_t device_pubkey[64]{};
-    EXPECT_TRUE(unit->generateKey(device_pubkey, Slot::PrimaryPrivateKey));  // Slot 0
-
-    uint8_t shared_secret[32]{};
-    EXPECT_TRUE(atecc.ECDHStoredKey(shared_secret, device_pubkey, Slot::PrimaryPrivateKey));
-    //    EXPECT_NE(shared_secret[0], 0);  // dummy check
-
-    // TempKey
-    uint8_t private_key[32]{};
-    ASSERT_TRUE(unit->readRandomArray(private_key));  // ランダムな秘密鍵（仮）
-    writeDataZone(8, private_key);
-    uint8_t pubkey[64]{};
-    ASSERT_TRUE(SHA256::generatePublicKey(pubkey, slot8);  // 外部で公開鍵を生成（ソフト）
-
-    // TempKey に秘密鍵を渡す（64バイト: priv || zero）
-    uint8_t key_buf[64]{};
-    memcpy(key_buf, private_key, 32);
-    ASSERT_TRUE(atecc.writeNonce64(Destination::TempKey, key_buf));
-
-    uint8_t shared_secret[32]{};
-    ASSERT_TRUE(atecc.ECDHTempKey(shared_secret, pubkey));
-    EXPECT_NE(shared_secret[0], 0);
-}
-
 
 TEST_P(TestATECC608B_TNGTLS, ECDHStoredKey)
 {
@@ -825,7 +698,6 @@ TEST_P(TestATECC608B_TNGTLS, ECDHTempKey)
         }
     }
 }
-
 
 TEST_P(TestATECC608B_TNGTLS, GenKey)
 {
@@ -973,7 +845,6 @@ TEST_P(TestATECC608B_TNGTLS, SignExternal)
         }
     }
 }
-#endif
 
 TEST_P(TestATECC608B_TNGTLS, SignInternal)
 {
