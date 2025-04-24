@@ -107,7 +107,7 @@ AWS IoT Endpoint
 ### 3. Build settings
 
 #### ArduinoIDE
-Edit source file
+Edit Blinky-Hello-World.ino
 ```cpp
 // ****************************************************************************************************
 // Settings
