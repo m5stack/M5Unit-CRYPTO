@@ -671,7 +671,7 @@ bool UnitATECC608B::receive_response(uint8_t* data, const uint32_t dlen)
 
     // Any response data or status
     const auto clen = std::min(count - 3 /* count , crc16 */, dlen);
-    //M5_LIB_LOGW("R>>> count:%u out:%u clen:%u", count, dlen, clen);
+    // M5_LIB_LOGW("R>>> count:%u out:%u clen:%u", count, dlen, clen);
     memcpy(data, rbuf + 1, clen);
 
     // Did not get the expected data length?
