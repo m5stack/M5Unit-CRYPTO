@@ -219,10 +219,10 @@ void dump_cert(const mbedtls_x509_crt *cert, const bool raw = false)
     }
 }
 
-void printPEM(const uint8_t *der, const uint32_t dlen, const char *header, const char *footer)
+void printPEM(const uint8_t *der, const uint32_t dlen)
 {
     char buf[1024]{};
-    if (convertToPEM(buf, sizeof(buf), der, dlen, header, footer)) {
+    if (convertToPEM(buf, sizeof(buf), der, dlen)) {
         M5.Log.printf(buf);
     } else {
         M5_LOGE("Failed to convert PEM");
