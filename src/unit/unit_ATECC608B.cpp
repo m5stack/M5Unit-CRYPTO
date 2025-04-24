@@ -18,13 +18,18 @@ using m5::unit::types::elapsed_time_t;
 
 namespace {
 constexpr std::array<uint8_t, 4> RESPONSE{0x04, 0x11, 0x33, 0x43};
-constexpr uint8_t fixed_nonce_mode_table32[]   = {NONCE_MODE_TARGET_TEMPKEY, NONCE_MODE_TARGET_DIGEST,
-                                                  NONCE_MODE_TARGET_ALTKEY, 0xFF};
-constexpr uint8_t fixed_nonce_mode_table64[]   = {NONCE_MODE_TARGET_TEMPKEY, NONCE_MODE_TARGET_DIGEST, 0xFF, 0xFF};
+
+constexpr uint8_t fixed_nonce_mode_table32[] = {NONCE_MODE_TARGET_TEMPKEY, NONCE_MODE_TARGET_DIGEST,
+                                                NONCE_MODE_TARGET_ALTKEY, 0xFF};
+
+constexpr uint8_t fixed_nonce_mode_table64[] = {NONCE_MODE_TARGET_TEMPKEY, NONCE_MODE_TARGET_DIGEST, 0xFF, 0xFF};
+
 constexpr uint8_t finalize_sha256_mode_table[] = {SHA_MODE_OUTPUT_TEMPKEY, SHA_MODE_OUTPUT_DIGEST, 0xFF,
                                                   SHA_MODE_OUTPUT_BUFFER};
-constexpr uint8_t sign_source_table[]          = {SIGN_MODE_TEMPKEY, SIGN_MODE_DIGEST, 0xFF, 0xFF};
-constexpr uint8_t verify_source_table[]        = {SIGN_MODE_TEMPKEY, SIGN_MODE_DIGEST, 0xFF, 0xFF};
+
+constexpr uint8_t sign_source_table[] = {SIGN_MODE_TEMPKEY, SIGN_MODE_DIGEST, 0xFF, 0xFF};
+
+constexpr uint8_t verify_source_table[] = {SIGN_MODE_TEMPKEY, SIGN_MODE_DIGEST, 0xFF, 0xFF};
 
 const uint8_t otp_608b[] = {};
 
