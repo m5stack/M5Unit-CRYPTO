@@ -4,6 +4,8 @@
 
 Porting from https://github.com/m5stack/Core2-for-AWS-IoT-Kit/tree/master/Blinky-Hello-World
 
+Connection using M5Unit-ID as well as the built-in chip of Core2AWS is possible.
+
 The porting source emits LEDs, but some devices do not have LEDs, so sound is played or displayed on the LCD instead.
 
 
@@ -102,19 +104,7 @@ AWS IoT Endpoint
     "endpointAddress": "exampleexample-ats.iot.region.amazonaws.com"
 }
 ```
-### 3. Download AWS Root CA
-```bash
-scripts/download_aws_root.sh
-
-```
-```log
-./scripts/download_aws_root.sh
-[1/3] Downloading PEM from https://www.amazontrust.com/repository/AmazonRootCA1.pem...
-[2/3] Converting to DER format...
-[3/3] Done! Saved as ./data/AmazonRootCA1.der
-```
-
-### 4. Build settings
+### 3. Build settings
 
 #### ArduinoIDE
 Edit source file
@@ -156,7 +146,7 @@ build_flags = ${option_release.build_flags}
   -DEXAMPLE_MQTT_URI="\"exampleexample-ats.iot.region.amazonaws.com\""
 ```
 
-### 5. Uplaod & Monitor
+### 4. Uplaod & Monitor
 Build and upload program.  
 If the connection is successful, the following log will be output to the serial monitor
 
