@@ -96,7 +96,7 @@ bool convertToPEM(char* out, const uint32_t olen, const uint8_t* der, uint32_t d
     const uint32_t total_b64_out_len = base64_len + line_breaks;
 
     const uint32_t needed = strlen("-----BEGIN -----\n") + strlen(header) + total_b64_out_len +
-                            strlen("-----END -----\n") + strlen(footer) + 1;  // '\0'
+                            strlen("\n-----END -----\n") + strlen(footer) + 1;  // '\0'
     if (needed > olen) {
         return false;
     }
@@ -111,7 +111,7 @@ bool convertToPEM(char* out, const uint32_t olen, const uint8_t* der, uint32_t d
     }
     written += b64_written;
     // footer
-    written += snprintf(out + written, olen - written, "-----END %s-----\n", footer);
+    written += snprintf(out + written, olen - written, "\n-----END %s-----\n", footer);
     // terminate
     if (written < olen) {
         out[written] = '\0';

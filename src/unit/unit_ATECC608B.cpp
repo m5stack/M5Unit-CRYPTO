@@ -671,14 +671,15 @@ bool UnitATECC608B::receive_response(uint8_t* data, const uint32_t dlen)
 
     // Any response data or status
     const auto clen = std::min(count - 3 /* count , crc16 */, dlen);
-    // M5_LIB_LOGD("R>>> count:%u out:%u clen:%u", count, dlen, clen);
+    //M5_LIB_LOGW("R>>> count:%u out:%u clen:%u", count, dlen, clen);
     memcpy(data, rbuf + 1, clen);
 
-    if (clen == 1 && data[0] != 0) {
+    // Did not get the expected data length?
+    if ((dlen > 1 && clen == 1) && data[0] != 0) {
         M5_LIB_LOGE("Receive error: %02X", data[0]);
+        return false;
     }
-
-    return (clen > 1) || (data[0] == 0);
+    return true;
 }
 
 bool UnitATECC608B::read_data(uint8_t* rbuf, const uint32_t rlen, const uint8_t zone, const uint16_t address,
