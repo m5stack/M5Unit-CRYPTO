@@ -284,10 +284,6 @@ TEST_P(TestATECC608B_TNGTLS, Nonce)
     uint8_t nonce32[32]{0x11};
     uint8_t nonce64[64]{0x22};
 
-    //    clear_tempkey(unit.get());
-    //    EXPECT_TRUE(unit->readDeviceState(state));
-    //    M5_LOGW("1S:%04X", state);
-
     // RNG mode: useRNG = true, updateSeed = true
     EXPECT_TRUE(clear_tempkey(unit.get()));
     EXPECT_TRUE(unit->createNonce(output, input20, true, true));
@@ -871,7 +867,7 @@ TEST_P(TestATECC608B_TNGTLS, SignInternal)
     }
 
     // Failed because illegal TempKey (TempKey need to made by GenDlg, GenKey)
-    const uint8_t nin[20]{};
+    const uint8_t nin[20]{0x12};
     EXPECT_TRUE(unit->createNonce(nullptr, nin));
     EXPECT_TRUE(unit->readDeviceState(state));
     EXPECT_TRUE(is_valid_tempkey(state));
