@@ -146,7 +146,7 @@ build_flags = ${option_release.build_flags}
   -DEXAMPLE_MQTT_URI="\"exampleexample-ats.iot.region.amazonaws.com\""
 ```
 
-### 4. Uplaod & Monitor
+### 4. Upload & Monitor
 Build and upload program.  
 If the connection is successful, the following log will be output to the serial monitor
 
