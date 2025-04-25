@@ -86,7 +86,7 @@ enum Error : uint8_t {
 constexpr uint32_t DELAY_READ{3};
 constexpr uint32_t DELAY_WRITE{4};
 constexpr uint32_t DELAY_INFO{2};
-constexpr uint32_t DELAY_NONCE{15};
+constexpr uint32_t DELAY_NONCE{16};
 constexpr uint32_t DELAY_SELFTEST{200};
 constexpr uint32_t DELAY_RANDOM{23};
 constexpr uint32_t DELAY_COUNTER{20};

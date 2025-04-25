@@ -353,8 +353,6 @@ bool UnitATECC608B::createNonce(uint8_t output[32], const uint8_t input[20], con
     const uint8_t mode    = (updateSeed ? NONCE_MODE_RANDOM_UPDATE_SEED : NONCE_MODE_RANDOM_NOT_UPDATE_SEED);
     const uint16_t param2 = (useRNG ? NONCE_USE_TRNG : NONCE_USE_TEMPKEY);
 
-    M5_LIB_LOGE("createNonec:%02X, %04X", mode, param2);
-
     if (send_command(OPCODE_NONCE, mode, param2, input, 20)) {
         m5::utility::delay(DELAY_NONCE);
         ok = receive_response(output ? output : buf, 32);
@@ -372,9 +370,6 @@ bool UnitATECC608B::write_nonce(const Destination dest, const uint8_t* input, co
     }
 
     bool ok{};
-
-    M5_LIB_LOGE("writeNoncee%u:%02X %04X", ilen, mode, 0x0000);
-
     if (send_command(OPCODE_NONCE, mode, 0x0000, input, ilen)) {
         m5::utility::delay(DELAY_NONCE);
         uint8_t status{};
