@@ -49,7 +49,7 @@ namespace unit {
 // class UnitATECC608B
 const char UnitATECC608B::name[] = "UnitATECC608B";
 const types::uid_t UnitATECC608B::uid{"UnitATECC608B"_mmh3};
-const types::attr_t UnitATECC608B::attr{0};
+const types::attr_t UnitATECC608B::attr{attribute::AccessI2C};
 
 bool UnitATECC608B::begin()
 {

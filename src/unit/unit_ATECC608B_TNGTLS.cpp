@@ -231,7 +231,7 @@ namespace unit {
 // class UnitATECC608B_TNGTLS
 const char UnitATECC608B_TNGTLS::name[] = "UnitATECC608B_TNGTLS";
 const types::uid_t UnitATECC608B_TNGTLS::uid{"UnitATECC608B_TNGTLS"_mmh3};
-const types::attr_t UnitATECC608B_TNGTLS::attr{0};
+const types::attr_t UnitATECC608B_TNGTLS::attr{attribute::AccessI2C};
 
 bool UnitATECC608B_TNGTLS::begin_impl()
 {
