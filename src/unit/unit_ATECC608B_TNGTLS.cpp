@@ -8,7 +8,6 @@
  @brief ATECC608B-TNGTLS Unit for M5UnitUnified
 */
 #include "unit_ATECC608B_TNGTLS.hpp"
-#include "utility/sha1.hpp"
 #include <M5Utility.hpp>
 
 using namespace m5::utility::mmh3;

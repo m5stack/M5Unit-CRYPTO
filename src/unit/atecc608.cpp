@@ -8,8 +8,7 @@
   @brief ATECC608 definition
 */
 #include "atecc608.hpp"
-#include "utility/base64.hpp"
-#include <M5Utility.h>
+#include <M5Utility.hpp>
 
 namespace {
 

@@ -8,7 +8,6 @@
  @brief ATECC608B Unit for M5UnitUnified
 */
 #include "unit_ATECC608B.hpp"
-#include "utility/sha1.hpp"
 #include <M5Utility.hpp>
 
 using namespace m5::utility::mmh3;
@@ -82,7 +81,11 @@ bool UnitATECC608B::wakeup()
 {
     // Clock at wakeup must be less than 100K
     constexpr uint32_t REQUIRED_CLOCK{100 * 1000U};
-    auto ad         = adapter();
+    auto ad = asAdapter<AdapterI2C>(Adapter::Type::I2C);
+    if (!ad) {
+        M5_LIB_LOGE("No AdapterI2C");
+        return false;
+    }
     auto save_clock = ad->clock();
     if (save_clock > REQUIRED_CLOCK) {
         ad->setClock(REQUIRED_CLOCK);
