@@ -1,19 +1,4 @@
 var searchData=
 [
-  ['secondaryprivatekey1_0',['SecondaryPrivateKey1',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a0ac49ca60a890a1405692440b692c692',1,'m5::unit::atecc608']]],
-  ['secondaryprivatekey2_1',['SecondaryPrivateKey2',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a8d784a6f82f568a61789abc694b18661',1,'m5::unit::atecc608']]],
-  ['secondaryprivatekey3_2',['SecondaryPrivateKey3',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a51e1631cfb3ba3838eae15d72e2322d1',1,'m5::unit::atecc608']]],
-  ['selftest_3',['selfTest',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ab3df2b2400ca7f57842b6b7eb398f0c9',1,'m5::unit::UnitATECC608B']]],
-  ['sha1_4',['SHA1',['../classm5_1_1utility_1_1_s_h_a1.html',1,'m5::utility']]],
-  ['sha1_2ehpp_5',['sha1.hpp',['../sha1_8hpp.html',1,'']]],
-  ['sha256_6',['SHA256',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a91fd53f58eba5db57d2f11fc9ee56582',1,'m5::unit::UnitATECC608B']]],
-  ['signercompressedcertificate_7',['SignerCompressedCertificate',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a174222d2764241a9bf9e5c350c53ed33',1,'m5::unit::atecc608']]],
-  ['signerpublickey_8',['SignerPublicKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a2ba4b562881032ddc06d174f108c1da1',1,'m5::unit::atecc608']]],
-  ['signexternal_9',['signExternal',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#afa5b13a8e45f007d3affb2fb06f8033c',1,'m5::unit::UnitATECC608B']]],
-  ['signinternal_10',['signInternal',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a8ed24ac0597b329de3d8d392e65917c1',1,'m5::unit::UnitATECC608B']]],
-  ['sleep_11',['sleep',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a9041876a4dcbd675da0aab31e37d6c2b',1,'m5::unit::UnitATECC608B']]],
-  ['slot_12',['Slot',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733',1,'m5::unit::atecc608']]],
-  ['slot_5fblock_5fto_5fparam2_13',['slot_block_to_param2',['../atecc608_8hpp.html#a9b14f3df0d8153f7b0e33f18b445a6aa',1,'m5::unit::atecc608']]],
-  ['source_14',['Source',['../atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19',1,'m5::unit::atecc608']]],
-  ['startsha256_15',['startSHA256',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#af21150e6049ff9c660033835e859eb74',1,'m5::unit::UnitATECC608B']]]
+  ['tempkey_0',['TempKey',['../atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19aa661ada445430cfd79adb873071898df',1,'m5::unit::atecc608']]]
 ];

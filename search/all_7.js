@@ -1,7 +1,8 @@
 var searchData=
 [
-  ['idle_0',['idle',['../structm5_1_1unit_1_1_unit_a_t_e_c_c608_b_1_1config__t.html#a42622a2c6593b37064e7c7a6f742d5dd',1,'m5::unit::UnitATECC608B::config_t::idle'],['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5f3ea238d4fb723d438ba5546042f731',1,'m5::unit::UnitATECC608B::idle()']]],
-  ['incrementcounter_1',['incrementCounter',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a22b23bddf48378d8286c0313c2417e10',1,'m5::unit::UnitATECC608B']]],
-  ['internalsignprivatekey_2',['InternalSignPrivateKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a3205ee06dc588f7c1e7a2cfe1d063c86',1,'m5::unit::atecc608']]],
-  ['ioprotectionkey_3',['IOProtectionKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a746342b8abf188977ed7616e8f8a47c7',1,'m5::unit::atecc608']]]
+  ['m5_0',['m5',['../namespacem5.html',1,'']]],
+  ['m5unitcrypto_1',['M5UnitCRYPTO',['../index.html',1,'']]],
+  ['m5unitunifiedcrypto_2ehpp_2',['M5UnitUnifiedCRYPTO.hpp',['../_m5_unit_unified_c_r_y_p_t_o_8hpp.html',1,'']]],
+  ['macaddress_3',['MACAddress',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a184cdb8ad50abb359287bedaf22efa4c',1,'m5::unit::atecc608']]],
+  ['msgdigestbuffer_4',['MsgDigestBuffer',['../atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19aa4df4ea313d0b111bb4cdcaee2b813c7',1,'m5::unit::atecc608']]]
 ];

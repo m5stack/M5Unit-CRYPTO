@@ -7,6 +7,5 @@ var hierarchy =
       ] ]
     ] ],
     [ "m5::unit::UnitATECC608B::config_t", "structm5_1_1unit_1_1_unit_a_t_e_c_c608_b_1_1config__t.html", null ],
-    [ "m5::unit::atecc608::CompCertAccessor::DateTime", "structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html", null ],
-    [ "m5::utility::SHA1", "classm5_1_1utility_1_1_s_h_a1.html", null ]
+    [ "m5::unit::atecc608::CompCertAccessor::DateTime", "structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html", null ]
 ];

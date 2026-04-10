@@ -36,5 +36,5 @@ var atecc608_8hpp =
     [ "convertToPEM", "atecc608_8hpp.html#a358182add491ea5dcfbf82ea6d0ef784", null ],
     [ "encoded_base64_length", "atecc608_8hpp.html#aa874048a8a3d6e05642f7e5d2f820cd0", null ],
     [ "offset_to_param2_for_config", "atecc608_8hpp.html#aba01731899c8a5d4feaf127f8168203f", null ],
-    [ "slot_block_to_param2", "atecc608_8hpp.html#a9b14f3df0d8153f7b0e33f18b445a6aa", null ]
+    [ "slot_block_to_param2", "atecc608_8hpp.html#a187453b73a7c93175199238cc20fa1cd", null ]
 ];

@@ -27,7 +27,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">M5Unit-CRYPTO<span id="projectnumber">&#160;0.1.0 git rev:99e558e</span>
+   <div id="projectname">M5Unit-CRYPTO<span id="projectnumber">&#160;0.2.0 git rev:caebf23</span>
    </div>
   </td>
  </tr>
@@ -115,6 +115,7 @@ $(function(){initNavTree('atecc608_8hpp.html',''); initResizable(true); });
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html">m5::unit::atecc608::CompCertAccessor</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compressed certificate accessor.  <a href="classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html">m5::unit::atecc608::CompCertAccessor::DateTime</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -153,7 +154,7 @@ Enumerations</h2></td></tr>
 , <a class="el" href="#a056ea9efd6148442c4942edfe1b0b733a174222d2764241a9bf9e5c350c53ed33">SignerCompressedCertificate</a>
 <br />
  }</td></tr>
-<tr class="memdesc:a056ea9efd6148442c4942edfe1b0b733"><td class="mdescLeft">&#160;</td><td class="mdescRight">Slot configuration summay.  <a href="#a056ea9efd6148442c4942edfe1b0b733">More...</a><br /></td></tr>
+<tr class="memdesc:a056ea9efd6148442c4942edfe1b0b733"><td class="mdescLeft">&#160;</td><td class="mdescRight">Slot configuration summary.  <a href="#a056ea9efd6148442c4942edfe1b0b733">More...</a><br /></td></tr>
 <tr class="separator:a056ea9efd6148442c4942edfe1b0b733"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a024323b4632b119a89ac5252b27e8e19" id="r_a024323b4632b119a89ac5252b27e8e19"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a024323b4632b119a89ac5252b27e8e19">m5::unit::atecc608::Source</a> : uint8_t { <a class="el" href="#a024323b4632b119a89ac5252b27e8e19aa661ada445430cfd79adb873071898df">TempKey</a>
 , <a class="el" href="#a024323b4632b119a89ac5252b27e8e19aa4df4ea313d0b111bb4cdcaee2b813c7">MsgDigestBuffer</a>
@@ -185,10 +186,10 @@ Functions</h2></td></tr>
 uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::offset_to_param2_for_config</b> (const uint8_t offset)</td></tr>
 <tr class="memdesc:aba01731899c8a5d4feaf127f8168203f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Conversion offset to address for Config,OTP zone. <br /></td></tr>
 <tr class="separator:aba01731899c8a5d4feaf127f8168203f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9b14f3df0d8153f7b0e33f18b445a6aa" id="r_a9b14f3df0d8153f7b0e33f18b445a6aa"><td class="memItemLeft" align="right" valign="top"><a id="a9b14f3df0d8153f7b0e33f18b445a6aa" name="a9b14f3df0d8153f7b0e33f18b445a6aa"></a>
-uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::slot_block_to_param2</b> (const uint8_t slot, const uint8_t offset)</td></tr>
-<tr class="memdesc:a9b14f3df0d8153f7b0e33f18b445a6aa"><td class="mdescLeft">&#160;</td><td class="mdescRight">Conversion slot and block to address for Data zone. <br /></td></tr>
-<tr class="separator:a9b14f3df0d8153f7b0e33f18b445a6aa"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a187453b73a7c93175199238cc20fa1cd" id="r_a187453b73a7c93175199238cc20fa1cd"><td class="memItemLeft" align="right" valign="top"><a id="a187453b73a7c93175199238cc20fa1cd" name="a187453b73a7c93175199238cc20fa1cd"></a>
+uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::slot_block_to_param2</b> (const uint8_t slot, const uint16_t offset)</td></tr>
+<tr class="memdesc:a187453b73a7c93175199238cc20fa1cd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Conversion slot and block to address for Data zone. <br /></td></tr>
+<tr class="separator:a187453b73a7c93175199238cc20fa1cd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa874048a8a3d6e05642f7e5d2f820cd0" id="r_aa874048a8a3d6e05642f7e5d2f820cd0"><td class="memItemLeft" align="right" valign="top"><a id="aa874048a8a3d6e05642f7e5d2f820cd0" name="aa874048a8a3d6e05642f7e5d2f820cd0"></a>
 constexpr uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::encoded_base64_length</b> (const uint32_t ilen)</td></tr>
 <tr class="memdesc:aa874048a8a3d6e05642f7e5d2f820cd0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Calculate encoded size (no line break) <br /></td></tr>
@@ -234,7 +235,7 @@ constexpr uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit
 </table>
 </div><div class="memdoc">
 
-<p>Slot configuration summay. </p>
+<p>Slot configuration summary. </p>
 <table class="fieldtable">
 <tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a056ea9efd6148442c4942edfe1b0b733a1b90159f5506f276a5f5f2092ca72acf" name="a056ea9efd6148442c4942edfe1b0b733a1b90159f5506f276a5f5f2092ca72acf"></a>PrimaryPrivateKey&#160;</td><td class="fielddoc"><p>Primary authentication key. </p>
 </td></tr>

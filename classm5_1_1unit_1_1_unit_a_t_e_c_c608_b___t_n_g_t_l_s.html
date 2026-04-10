@@ -27,7 +27,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">M5Unit-CRYPTO<span id="projectnumber">&#160;0.1.0 git rev:99e558e</span>
+   <div id="projectname">M5Unit-CRYPTO<span id="projectnumber">&#160;0.2.0 git rev:caebf23</span>
    </div>
   </td>
  </tr>
@@ -103,6 +103,11 @@ $(function(){initNavTree('classm5_1_1unit_1_1_unit_a_t_e_c_c608_b___t_n_g_t_l_s.
   <div class="headertitle"><div class="title">m5::unit::UnitATECC608B_TNGTLS Class Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>ATECC608B-TNGTLS unit.  
+ <a href="#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="unit___a_t_e_c_c608_b___t_n_g_t_l_s_8hpp_source.html">unit_ATECC608B_TNGTLS.hpp</a>&gt;</code></p>
 <div class="dynheader">
 Inheritance diagram for m5::unit::UnitATECC608B_TNGTLS:</div>
 <div class="dyncontent">
@@ -118,6 +123,10 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a9d1f5f80f23493348e2aa72539b69e29" id="r_a9d1f5f80f23493348e2aa72539b69e29"><td class="memItemLeft" align="right" valign="top"><a id="a9d1f5f80f23493348e2aa72539b69e29" name="a9d1f5f80f23493348e2aa72539b69e29"></a>
 &#160;</td><td class="memItemRight" valign="bottom"><b>UnitATECC608B_TNGTLS</b> (const uint8_t addr=DEFAULT_ADDRESS)</td></tr>
 <tr class="separator:a9d1f5f80f23493348e2aa72539b69e29"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr><td colspan="2"><div class="groupHeader">Random</div></td></tr>
+<tr class="memitem:aa74934672d4a6e2116b7d30efa7bc969" id="r_aa74934672d4a6e2116b7d30efa7bc969"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa74934672d4a6e2116b7d30efa7bc969">readRandomArray</a> (uint8_t data[32], const bool updateSeed=true) override</td></tr>
+<tr class="memdesc:aa74934672d4a6e2116b7d30efa7bc969"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read TRNG output.  <br /></td></tr>
+<tr class="separator:aa74934672d4a6e2116b7d30efa7bc969"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr><td colspan="2"><div class="groupHeader">Certificate</div></td></tr>
 <tr class="memitem:aa57f7b40ceed6ac02f3f26e3c4b86a33" id="r_aa57f7b40ceed6ac02f3f26e3c4b86a33"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa57f7b40ceed6ac02f3f26e3c4b86a33">readDeviceCertificate</a> (uint8_t *out, uint16_t &amp;olen, const bool fillAuthKeyId=true)</td></tr>
 <tr class="memdesc:aa57f7b40ceed6ac02f3f26e3c4b86a33"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read the device certificate (DER)  <br /></td></tr>
@@ -133,7 +142,7 @@ Public Member Functions</h2></td></tr>
 virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>begin</b> () override</td></tr>
 <tr class="separator:accb9f8af5fdbb7d07d0fbe98cd29f165 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac008193aca49632fb5556e8e456758ea inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_ac008193aca49632fb5556e8e456758ea"><td class="memItemLeft" align="right" valign="top">const uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ac008193aca49632fb5556e8e456758ea">revision</a> () const</td></tr>
-<tr class="memdesc:ac008193aca49632fb5556e8e456758ea inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get the revison.  <br /></td></tr>
+<tr class="memdesc:ac008193aca49632fb5556e8e456758ea inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get the revision.  <br /></td></tr>
 <tr class="separator:ac008193aca49632fb5556e8e456758ea inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a412841c738d106ef98f79277cec31179 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a412841c738d106ef98f79277cec31179"><td class="memItemLeft" align="right" valign="top">
 uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>getSlotSize</b> (const <a class="el" href="atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733">atecc608::Slot</a> slot) const</td></tr>
@@ -141,11 +150,11 @@ uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>getSlotSize</b> (
 <tr class="separator:a412841c738d106ef98f79277cec31179 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4f10919e6c7f93ba21700156a5105381 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a4f10919e6c7f93ba21700156a5105381"><td class="memItemLeft" align="right" valign="top">
 <a class="el" href="structm5_1_1unit_1_1_unit_a_t_e_c_c608_b_1_1config__t.html">config_t</a>&#160;</td><td class="memItemRight" valign="bottom"><b>config</b> ()</td></tr>
-<tr class="memdesc:a4f10919e6c7f93ba21700156a5105381 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Gets the configration. <br /></td></tr>
+<tr class="memdesc:a4f10919e6c7f93ba21700156a5105381 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Gets the configuration. <br /></td></tr>
 <tr class="separator:a4f10919e6c7f93ba21700156a5105381 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9c7482fe30614fd53241fcc2f3df2737 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a9c7482fe30614fd53241fcc2f3df2737"><td class="memItemLeft" align="right" valign="top">
 void&#160;</td><td class="memItemRight" valign="bottom"><b>config</b> (const <a class="el" href="structm5_1_1unit_1_1_unit_a_t_e_c_c608_b_1_1config__t.html">config_t</a> &amp;cfg)</td></tr>
-<tr class="memdesc:a9c7482fe30614fd53241fcc2f3df2737 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set the configration. <br /></td></tr>
+<tr class="memdesc:a9c7482fe30614fd53241fcc2f3df2737 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set the configuration. <br /></td></tr>
 <tr class="separator:a9c7482fe30614fd53241fcc2f3df2737 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5d8dfbfa411735a187909d1f124d0c81 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a5d8dfbfa411735a187909d1f124d0c81"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5d8dfbfa411735a187909d1f124d0c81">wakeup</a> ()</td></tr>
 <tr class="memdesc:a5d8dfbfa411735a187909d1f124d0c81 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Device to active.  <br /></td></tr>
@@ -180,9 +189,6 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>config</b> (const <a 
 <tr class="memitem:a59e94a184db7de738e751da4c07d74df inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a59e94a184db7de738e751da4c07d74df"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a59e94a184db7de738e751da4c07d74df">writeNonce64</a> (const <a class="el" href="atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19">atecc608::Destination</a> dest, const uint8_t input[64])</td></tr>
 <tr class="memdesc:a59e94a184db7de738e751da4c07d74df inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">write nonce 64 bytes  <br /></td></tr>
 <tr class="separator:a59e94a184db7de738e751da4c07d74df inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a06c1e20450eace770c66280771b29cd4 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a06c1e20450eace770c66280771b29cd4"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a06c1e20450eace770c66280771b29cd4">readRandomArray</a> (uint8_t data[32], const bool updateSeed=true)</td></tr>
-<tr class="memdesc:a06c1e20450eace770c66280771b29cd4 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read TRNG output.  <br /></td></tr>
-<tr class="separator:a06c1e20450eace770c66280771b29cd4 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab86ad35c3e9f58aedfd1d110a4160c06 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_ab86ad35c3e9f58aedfd1d110a4160c06"><td class="memTemplParams" colspan="2">template&lt;typename T , typename std::enable_if&lt; std::is_integral&lt; T &gt;::value, std::nullptr_t &gt;::type  = nullptr&gt; </td></tr>
 <tr class="memitem:ab86ad35c3e9f58aedfd1d110a4160c06 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ab86ad35c3e9f58aedfd1d110a4160c06">readRandom</a> (T &amp;value, const T lower, const T upper)</td></tr>
 <tr class="memdesc:ab86ad35c3e9f58aedfd1d110a4160c06 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Generate a random value of type T in the specified range.  <br /></td></tr>
@@ -223,12 +229,15 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>config</b> (const <a 
 <tr class="memitem:a801094790b3b476d38acc3878656172b inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a801094790b3b476d38acc3878656172b"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a801094790b3b476d38acc3878656172b">readDataZone</a> (uint8_t *data, const uint16_t len, const <a class="el" href="atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733">atecc608::Slot</a> slot)</td></tr>
 <tr class="memdesc:a801094790b3b476d38acc3878656172b inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read the data zone.  <br /></td></tr>
 <tr class="separator:a801094790b3b476d38acc3878656172b inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5d9cee37c073bd01ee46787497041285 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a5d9cee37c073bd01ee46787497041285"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5d9cee37c073bd01ee46787497041285">writeGeneralData</a> (const uint8_t *data, const uint16_t len, const uint16_t offset=0)</td></tr>
+<tr class="memdesc:a5d9cee37c073bd01ee46787497041285 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write data to GeneralData slot (Slot 8, clear text)  <br /></td></tr>
+<tr class="separator:a5d9cee37c073bd01ee46787497041285 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4785e12c24164efe032c91ef21c609ee inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a4785e12c24164efe032c91ef21c609ee"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a4785e12c24164efe032c91ef21c609ee">readGeneralData</a> (uint8_t *data, const uint16_t len, const uint16_t offset=0)</td></tr>
+<tr class="memdesc:a4785e12c24164efe032c91ef21c609ee inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read data from GeneralData slot (Slot 8)  <br /></td></tr>
+<tr class="separator:a4785e12c24164efe032c91ef21c609ee inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2e928c1079eaeda8b891f3d4fc3d36c4 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a2e928c1079eaeda8b891f3d4fc3d36c4"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a2e928c1079eaeda8b891f3d4fc3d36c4">readOTPZone</a> (uint8_t otp[64])</td></tr>
-<tr class="memdesc:a2e928c1079eaeda8b891f3d4fc3d36c4 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read the OTP zone @paran[out] Output buffer at least 64 bytes.  <br /></td></tr>
+<tr class="memdesc:a2e928c1079eaeda8b891f3d4fc3d36c4 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read the OTP zone.  <br /></td></tr>
 <tr class="separator:a2e928c1079eaeda8b891f3d4fc3d36c4 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab3df2b2400ca7f57842b6b7eb398f0c9 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_ab3df2b2400ca7f57842b6b7eb398f0c9"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ab3df2b2400ca7f57842b6b7eb398f0c9">selfTest</a> (uint8_t resultBits, const uint8_t testBits=0x3D)</td></tr>
-<tr class="memdesc:ab3df2b2400ca7f57842b6b7eb398f0c9 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Self test.  <br /></td></tr>
-<tr class="separator:ab3df2b2400ca7f57842b6b7eb398f0c9 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af21150e6049ff9c660033835e859eb74 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_af21150e6049ff9c660033835e859eb74"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#af21150e6049ff9c660033835e859eb74">startSHA256</a> ()</td></tr>
 <tr class="memdesc:af21150e6049ff9c660033835e859eb74 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Start calculate SHA256.  <br /></td></tr>
 <tr class="separator:af21150e6049ff9c660033835e859eb74 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -242,7 +251,7 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>config</b> (const <a 
 <tr class="memdesc:a91fd53f58eba5db57d2f11fc9ee56582 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Calculate SHA256.  <br /></td></tr>
 <tr class="separator:a91fd53f58eba5db57d2f11fc9ee56582 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac240108942920ba19f39274cadb3a42c inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_ac240108942920ba19f39274cadb3a42c"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ac240108942920ba19f39274cadb3a42c">ECDHStoredKey</a> (uint8_t out[32], const <a class="el" href="atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733">atecc608::Slot</a> slot, const uint8_t pubKey[64])</td></tr>
-<tr class="memdesc:ac240108942920ba19f39274cadb3a42c inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Plane text)  <br /></td></tr>
+<tr class="memdesc:ac240108942920ba19f39274cadb3a42c inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Plain text)  <br /></td></tr>
 <tr class="separator:ac240108942920ba19f39274cadb3a42c inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a64ca9cfe0efdbe9db66f6361a5bae7c6 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a64ca9cfe0efdbe9db66f6361a5bae7c6"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a64ca9cfe0efdbe9db66f6361a5bae7c6">ECDHStoredKey</a> (uint8_t out[32], uint8_t nonce[32], const <a class="el" href="atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733">atecc608::Slot</a> slot, const uint8_t pubKey[64])</td></tr>
 <tr class="memdesc:a64ca9cfe0efdbe9db66f6361a5bae7c6 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Encrypted)  <br /></td></tr>
@@ -251,13 +260,13 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>config</b> (const <a 
 <tr class="memdesc:a04e865fb0dd1f8719e6af640e7cbef51 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Stored in TempKey)  <br /></td></tr>
 <tr class="separator:a04e865fb0dd1f8719e6af640e7cbef51 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6e774ae25f835ddf6a68a1ec57860d13 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a6e774ae25f835ddf6a68a1ec57860d13"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a6e774ae25f835ddf6a68a1ec57860d13">ECDHTempKey</a> (uint8_t out[32], const uint8_t pubKey[64])</td></tr>
-<tr class="memdesc:a6e774ae25f835ddf6a68a1ec57860d13 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Plane text)  <br /></td></tr>
+<tr class="memdesc:a6e774ae25f835ddf6a68a1ec57860d13 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Plain text)  <br /></td></tr>
 <tr class="separator:a6e774ae25f835ddf6a68a1ec57860d13 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a42f8a2d967571d5720851e20450ae5d8 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a42f8a2d967571d5720851e20450ae5d8"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a42f8a2d967571d5720851e20450ae5d8">ECDHTempKey</a> (uint8_t out[32], uint8_t nonce[32], const uint8_t pubKey[64])</td></tr>
 <tr class="memdesc:a42f8a2d967571d5720851e20450ae5d8 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Encrypted)  <br /></td></tr>
 <tr class="separator:a42f8a2d967571d5720851e20450ae5d8 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5dcc9bfec1af9ff284957902ab93223a inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a5dcc9bfec1af9ff284957902ab93223a"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5dcc9bfec1af9ff284957902ab93223a">ECDHTempKey</a> (const uint8_t pubKey[64])</td></tr>
-<tr class="memdesc:a5dcc9bfec1af9ff284957902ab93223a inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Stored in to TempKey)  <br /></td></tr>
+<tr class="memdesc:a5dcc9bfec1af9ff284957902ab93223a inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH (Stored in TempKey)  <br /></td></tr>
 <tr class="separator:a5dcc9bfec1af9ff284957902ab93223a inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4d7b728157452962b687ceb8f20728a5 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a4d7b728157452962b687ceb8f20728a5"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a4d7b728157452962b687ceb8f20728a5">ECDHTempKey</a> (const <a class="el" href="atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733">atecc608::Slot</a> slot, const uint8_t pubKey[64])</td></tr>
 <tr class="memdesc:a4d7b728157452962b687ceb8f20728a5 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">ECDH(Stored in slot)  <br /></td></tr>
@@ -284,8 +293,11 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>config</b> (const <a 
 <tr class="memdesc:af4b77a7e5e763fb69ad89568163ecf7d inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Verify the external public key.  <br /></td></tr>
 <tr class="separator:af4b77a7e5e763fb69ad89568163ecf7d inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac948ce12620722c3aa7f5af3726325b5 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_ac948ce12620722c3aa7f5af3726325b5"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ac948ce12620722c3aa7f5af3726325b5">verifyStored</a> (uint8_t mac[32], const uint8_t signature[64], const <a class="el" href="atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733">atecc608::Slot</a> slot, const <a class="el" href="atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19">atecc608::Source</a> src)</td></tr>
-<tr class="memdesc:ac948ce12620722c3aa7f5af3726325b5 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Verify the stored publick key.  <br /></td></tr>
+<tr class="memdesc:ac948ce12620722c3aa7f5af3726325b5 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Verify the stored public key.  <br /></td></tr>
 <tr class="separator:ac948ce12620722c3aa7f5af3726325b5 inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6f00cbf902792e2b0e4973c64ff527da inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b" id="r_a6f00cbf902792e2b0e4973c64ff527da"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a6f00cbf902792e2b0e4973c64ff527da">selfTest</a> (uint8_t &amp;resultBits, const uint8_t testBits=0x3D)</td></tr>
+<tr class="memdesc:a6f00cbf902792e2b0e4973c64ff527da inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Self test.  <br /></td></tr>
+<tr class="separator:a6f00cbf902792e2b0e4973c64ff527da inherit pub_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-methods" name="pro-methods"></a>
 Protected Member Functions</h2></td></tr>
@@ -324,7 +336,9 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>read_slot_config_word
 bool&#160;</td><td class="memItemRight" valign="bottom"><b>verify</b> (uint8_t mac[32], const uint8_t mode, const uint16_t param2, const uint8_t signature[64], const uint8_t pubKey[64], const <a class="el" href="atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19">atecc608::Source</a> src)</td></tr>
 <tr class="separator:a191fe6b5c238fd53dfeee31f7523ade9 inherit pro_methods_classm5_1_1unit_1_1_unit_a_t_e_c_c608_b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<h2 class="groupheader">Member Function Documentation</h2>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>ATECC608B-TNGTLS unit. </p>
+</div><h2 class="groupheader">Member Function Documentation</h2>
 <a id="a3a655b760bca4c740a8190de763fa502" name="a3a655b760bca4c740a8190de763fa502"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a3a655b760bca4c740a8190de763fa502">&#9670;&#160;</a></span>begin_impl()</h2>
 
@@ -549,12 +563,54 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>verify</b> (uint8_t m
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[out]</td><td class="paramname">out</td><td>Output buffer </td></tr>
-    <tr><td class="paramdir"></td><td class="paramname">[in/out]</td><td>in:Output buffer length out:Length of output to buffer </td></tr>
+    <tr><td class="paramdir">[in,out]</td><td class="paramname">in:Output</td><td>buffer length out:Length of output to buffer </td></tr>
     <tr><td class="paramdir"></td><td class="paramname">fillAuthKeyId</td><td>Fill auth key id from signer if true </td></tr>
   </table>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>True if successful </dd></dl>
+
+</div>
+</div>
+<a id="aa74934672d4a6e2116b7d30efa7bc969" name="aa74934672d4a6e2116b7d30efa7bc969"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa74934672d4a6e2116b7d30efa7bc969">&#9670;&#160;</a></span>readRandomArray()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool m5::unit::UnitATECC608B_TNGTLS::readRandomArray </td>
+          <td>(</td>
+          <td class="paramtype">uint8_t</td>          <td class="paramname"><span class="paramname"><em>data</em></span>[32], </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const bool</td>          <td class="paramname"><span class="paramname"><em>updateSeed</em></span><span class="paramdefsep"> = </span><span class="paramdefval">true</span>&#160;)</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Read TRNG output. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[out]</td><td class="paramname">data</td><td>Output value (At least 32 bytes) </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">updateSeed</td><td>Ignored. ATECC608B-TNGTLS only supports Mode=0x00 (UPDATE_SEED). </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>True if successful </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>The <code>updateSeed</code> parameter is not supported on ATECC608B-TNGTLS (DS40002250A Table 5-19). The RNG seed is always updated regardless of this argument. </dd></dl>
+
+<p>Reimplemented from <a class="el" href="classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a06c1e20450eace770c66280771b29cd4">m5::unit::UnitATECC608B</a>.</p>
 
 </div>
 </div>
@@ -581,7 +637,7 @@ bool&#160;</td><td class="memItemRight" valign="bottom"><b>verify</b> (uint8_t m
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[out]</td><td class="paramname">out</td><td>Output buffer </td></tr>
-    <tr><td class="paramdir"></td><td class="paramname">[in/out]</td><td>in:Output buffer length out:Length of output to buffer </td></tr>
+    <tr><td class="paramdir">[in,out]</td><td class="paramname">in:Output</td><td>buffer length out:Length of output to buffer </td></tr>
   </table>
   </dd>
 </dl>

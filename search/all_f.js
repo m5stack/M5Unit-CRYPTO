@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['verifyexternal_0',['verifyExternal',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#af4b77a7e5e763fb69ad89568163ecf7d',1,'m5::unit::UnitATECC608B']]],
-  ['verifystored_1',['verifyStored',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ac948ce12620722c3aa7f5af3726325b5',1,'m5::unit::UnitATECC608B']]]
+  ['wakeup_0',['wakeup',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5d8dfbfa411735a187909d1f124d0c81',1,'m5::unit::UnitATECC608B']]],
+  ['writegeneraldata_1',['writeGeneralData',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5d9cee37c073bd01ee46787497041285',1,'m5::unit::UnitATECC608B']]],
+  ['writenonce32_2',['writeNonce32',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a30b3134e3cfc28a68e2d7b21b1e9b4c9',1,'m5::unit::UnitATECC608B']]],
+  ['writenonce64_3',['writeNonce64',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a59e94a184db7de738e751da4c07d74df',1,'m5::unit::UnitATECC608B']]]
 ];

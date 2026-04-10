@@ -1,9 +1,7 @@
 var searchData=
 [
-  ['generaldata_0',['GeneralData',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733ad6aaabcf3f11085cf804f75ea797e25e',1,'m5::unit::atecc608']]],
-  ['generatekey_1',['generateKey',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a6c2bc2eb3b03a61a52482d3ada877970',1,'m5::unit::UnitATECC608B']]],
-  ['generateprivatekey_2',['generatePrivateKey',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a8c50c755476763acf9ca91d907f3452a',1,'m5::unit::UnitATECC608B']]],
-  ['generatepublickey_3',['generatePublicKey',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a4201471b3360641681244cbfa1f4603d',1,'m5::unit::UnitATECC608B']]],
-  ['generatepublickeydigest_4',['generatePublicKeyDigest',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ab979d99089887d43b09e9d521214a512',1,'m5::unit::UnitATECC608B']]],
-  ['getslotsize_5',['getSlotSize',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a412841c738d106ef98f79277cec31179',1,'m5::unit::UnitATECC608B']]]
+  ['idle_0',['idle',['../structm5_1_1unit_1_1_unit_a_t_e_c_c608_b_1_1config__t.html#a42622a2c6593b37064e7c7a6f742d5dd',1,'m5::unit::UnitATECC608B::config_t::idle'],['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5f3ea238d4fb723d438ba5546042f731',1,'m5::unit::UnitATECC608B::idle()']]],
+  ['incrementcounter_1',['incrementCounter',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a22b23bddf48378d8286c0313c2417e10',1,'m5::unit::UnitATECC608B']]],
+  ['internalsignprivatekey_2',['InternalSignPrivateKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a3205ee06dc588f7c1e7a2cfe1d063c86',1,'m5::unit::atecc608']]],
+  ['ioprotectionkey_3',['IOProtectionKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a746342b8abf188977ed7616e8f8a47c7',1,'m5::unit::atecc608']]]
 ];
