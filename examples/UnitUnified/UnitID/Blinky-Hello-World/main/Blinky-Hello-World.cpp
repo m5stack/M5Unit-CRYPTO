@@ -10,6 +10,7 @@
 #include <M5UnitUnified.h>
 #include <M5UnitUnifiedCRYPTO.h>
 #include <M5Utility.h>
+#include <M5HAL.hpp>
 
 #include <WiFi.h>
 
@@ -20,52 +21,7 @@
 #include <mbedtls/pk.h>
 #include <mbedtls/debug.h>
 
-#if __has_include(<esp_idf_version.h>)
-#include <esp_idf_version.h>
-#else  // esp_idf_version.h has been introduced in Arduino 1.0.5 (ESP-IDF3.3)
-#define ESP_IDF_VERSION_VAL(major, minor, patch) ((major << 16) | (minor << 8) | (patch))
-#define ESP_IDF_VERSION                          ESP_IDF_VERSION_VAL(3, 2, 0)
-#endif
-
-#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
-// ESP-IDF 4.x
-#include <mbedtls/pk_internal.h>  // Moved to inner ./library after ESP-IDF 5.0 or later (Cannot include it)
-#define MBEDTLS_PRIVATE(member) member
-
-#else
-// ESP-IDF 5.x Hack... mbedtls_pk_info_t is incompleted type
-struct mbedtls_pk_info_t {
-    mbedtls_pk_type_t type;
-    const char *name;
-    size_t (*get_bitlen)(mbedtls_pk_context *pk);
-    int (*can_do)(mbedtls_pk_type_t type);
-    int (*verify_func)(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
-                       const unsigned char *sig, size_t sig_len);
-    int (*sign_func)(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
-                     unsigned char *sig, size_t sig_size, size_t *sig_len,
-                     int (*f_rng)(void *, unsigned char *, size_t), void *p_rng);
-#if defined(MBEDTLS_ECDSA_C) && defined(MBEDTLS_ECP_RESTARTABLE)
-    int (*verify_rs_func)(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
-                          const unsigned char *sig, size_t sig_len, void *rs_ctx);
-    int (*sign_rs_func)(mbedtls_pk_context *pk, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
-                        unsigned char *sig, size_t sig_size, size_t *sig_len,
-                        int (*f_rng)(void *, unsigned char *, size_t), void *p_rng, void *rs_ctx);
-#endif
-    int (*decrypt_func)(mbedtls_pk_context *pk, const unsigned char *input, size_t ilen, unsigned char *output,
-                        size_t *olen, size_t osize, int (*f_rng)(void *, unsigned char *, size_t), void *p_rng);
-    int (*encrypt_func)(mbedtls_pk_context *pk, const unsigned char *input, size_t ilen, unsigned char *output,
-                        size_t *olen, size_t osize, int (*f_rng)(void *, unsigned char *, size_t), void *p_rng);
-    int (*check_pair_func)(mbedtls_pk_context *pub, mbedtls_pk_context *prv,
-                           int (*f_rng)(void *, unsigned char *, size_t), void *p_rng);
-    void *(*ctx_alloc_func)(void);
-    void (*ctx_free_func)(void *ctx);
-#if defined(MBEDTLS_ECDSA_C) && defined(MBEDTLS_ECP_RESTARTABLE)
-    void *(*rs_alloc_func)(void);
-    void (*rs_free_func)(void *rs_ctx);
-#endif
-    void (*debug_func)(mbedtls_pk_context *pk, mbedtls_pk_debug_item *items);
-};
-#endif
+#include "../src/mbedtls_pk_info_compat.h"
 
 using namespace m5::unit::atecc608;
 
@@ -223,7 +179,7 @@ void printPEM(const uint8_t *der, const uint32_t dlen)
 {
     char buf[1024]{};
     if (convertToPEM(buf, sizeof(buf), der, dlen)) {
-        M5.Log.printf(buf);
+        M5.Log.printf("%s", buf);
     } else {
         M5_LOGE("Failed to convert PEM");
     }
@@ -284,22 +240,19 @@ uint32_t encode_der_integer(uint8_t *out, const uint8_t *input, uint32_t input_s
     return total_size;
 }
 
-#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
-int custom_sign_callback(void *ctx, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
-                         unsigned char *sig, size_t *sig_len, int (*f_rng)(void *, unsigned char *, size_t),
-                         void *p_rng)
-#else
-int custom_sign_callback(mbedtls_pk_context *ctx, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
-                         unsigned char *sig, size_t sig_size, size_t *sig_len,
-                         int (*f_rng)(void *, unsigned char *, size_t), void *p_rng)
+int custom_sign_callback(custom_sign_ctx_t ctx, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
+                         unsigned char *sig,
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+                         size_t sig_size,
 #endif
+                         size_t *sig_len, int (*f_rng)(void *, unsigned char *, size_t), void *p_rng)
 {
     (void)ctx;
     (void)md_alg;
     (void)(f_rng);
     (void)(p_rng);
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    (void)sig_len;
+    (void)sig_size;
 #endif
 
     // Sign
@@ -342,6 +295,21 @@ int custom_sign_callback(mbedtls_pk_context *ctx, mbedtls_md_type_t md_alg, cons
 
 bool connectWiFi()
 {
+    // Tab5 (ESP32-P4) uses ESP32-C6 co-processor for WiFi via SDIO; set pins before WiFi.begin()
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    if (M5.getBoard() == m5::board_t::board_M5Tab5) {
+        constexpr int SDIO2_CLK = 12;
+        constexpr int SDIO2_CMD = 13;
+        constexpr int SDIO2_D0  = 11;
+        constexpr int SDIO2_D1  = 10;
+        constexpr int SDIO2_D2  = 9;
+        constexpr int SDIO2_D3  = 8;
+        constexpr int SDIO2_RST = 15;
+        WiFi.setPins(SDIO2_CLK, SDIO2_CMD, SDIO2_D0, SDIO2_D1, SDIO2_D2, SDIO2_D3, SDIO2_RST);
+    }
+#endif
+
+    WiFi.mode(WIFI_STA);
     if (ssid && ssid[0] && password && password[0]) {
         M5_LOGI("Use ssid:%s and password", ssid);
         WiFi.begin(ssid, password);
@@ -581,7 +549,7 @@ void cleanupTLS()
     mbedtls_entropy_free(&entropy);
 }
 
-void mqtt_payload_handller(const char *topic, const char *payload, uint32_t plen)
+void mqtt_payload_handler(const char *topic, const char *payload, uint32_t plen)
 {
     char top_topic[128]{};
     const char *sub_topic{};
@@ -595,10 +563,11 @@ void mqtt_payload_handller(const char *topic, const char *payload, uint32_t plen
         sub_topic = slash + 1;
     }
 
+    //  Receive "AWSclientId/blink" ?
     if (sub_topic && strcmp(sub_topic, "blink") == 0) {
         static uint32_t blink_count{};
         ++blink_count;
-        M5.Log.printf("Receive blink %u\n", blink_count);
+        M5.Log.printf("  == Receive blink %u\n", blink_count);
         lcd.fillScreen((blink_count & 1) ? TFT_ORANGE : TFT_DARKGREEN);
         M5.Speaker.tone(2000, 20);
 
@@ -640,7 +609,7 @@ bool mqtt_cycle_read(uint8_t &out_type)
             uint16_t payload_len = ret - 4 - topic_len;
             memcpy(payload, &buf[4 + topic_len], payload_len);
 
-            mqtt_payload_handller(topic, payload, payload_len);
+            mqtt_payload_handler(topic, payload, payload_len);
             break;
         }
         case 13:  // PINGRESP
@@ -826,7 +795,7 @@ bool yieldMQTT(uint32_t timeout_ms)
     do {
         auto now = m5::utility::millis();
 
-        // Read incomming packet
+        // Read incoming packet
         uint8_t pkt_type = 0;
         if (!mqtt_cycle_read(pkt_type)) {
             return false;
@@ -864,32 +833,70 @@ bool yieldMQTT(uint32_t timeout_ms)
 
 void setup()
 {
-    m5::utility::delay(3000);
-
     // esp_log_level_set("*", ESP_LOG_VERBOSE);
     M5.begin();
+    M5.setTouchButtonHeightByRatio(100);
+    if (lcd.height() > lcd.width()) {
+        lcd.setRotation(1);
+    }
 
     lcd.fillScreen(TFT_DARKGRAY);
 
-    auto pin_num_sda = M5.getPin(m5::pin_name_t::port_a_sda);
-    auto pin_num_scl = M5.getPin(m5::pin_name_t::port_a_scl);
+    auto board = M5.getBoard();
+
+    bool unit_ready{};
 #if defined(USING_M5CORE2_AWS_BUILTIN)
-#pragma message "Using  builtin ATECC608BTNGTLS"
-    if (M5.getBoard() == m5::board_t::board_M5StackCore2) {  // Core2 or Core2AWS
-        pin_num_sda = M5.getPin(m5::pin_name_t::in_i2c_sda);
-        pin_num_scl = M5.getPin(m5::pin_name_t::in_i2c_scl);
+#pragma message "Using builtin ATECC608BTNGTLS"
+    // Core2 AWS: Use M5.In_I2C for built-in ATECC608B
+    if (board == m5::board_t::board_M5StackCore2) {
+        M5_LOGI("Using M5.In_I2C");
+        unit_ready = Units.add(unit, M5.In_I2C) && Units.begin();
+    } else {
+        M5_LOGE("Only Core2AWS");
+        lcd.fillScreen(TFT_RED);
+        while (true) m5::utility::delay(10000);
+    }
+#else
+    // NessoN1: Arduino Wire (I2C_NUM_0) cannot be used for GROVE port.
+    //   Wire is used by M5Unified In_I2C for internal devices (IOExpander etc.).
+    //   Wire1 exists but is reserved for HatPort — cannot be used for GROVE.
+    //   Reconfiguring Wire to GROVE pins breaks In_I2C, causing ESP_ERR_INVALID_STATE in M5.update().
+    //   Solution: Use SoftwareI2C via M5HAL (bit-banging) for the GROVE port.
+    // NanoC6: Wire.begin() on GROVE pins conflicts with m5::I2C_Class registered by Ex_I2C.setPort()
+    //   on the same I2C_NUM_0, causing sporadic NACK errors.
+    //   Solution: Use M5.Ex_I2C (m5::I2C_Class) directly instead of Arduino Wire.
+    if (board == m5::board_t::board_ArduinoNessoN1) {
+        // NessoN1: GROVE is on port_b (GPIO 5/4), not port_a (which maps to Wire pins 8/10)
+        auto pin_num_sda = M5.getPin(m5::pin_name_t::port_b_out);
+        auto pin_num_scl = M5.getPin(m5::pin_name_t::port_b_in);
+        M5_LOGI("getPin(M5HAL): SDA:%u SCL:%u", pin_num_sda, pin_num_scl);
+        m5::hal::bus::I2CBusConfig i2c_cfg;
+        i2c_cfg.pin_sda = m5::hal::gpio::getPin(pin_num_sda);
+        i2c_cfg.pin_scl = m5::hal::gpio::getPin(pin_num_scl);
+        auto i2c_bus    = m5::hal::bus::i2c::getBus(i2c_cfg);
+        M5_LOGI("Bus:%d", i2c_bus.has_value());
+        unit_ready = Units.add(unit, i2c_bus ? i2c_bus.value() : nullptr) && Units.begin();
+    } else if (board == m5::board_t::board_M5NanoC6) {
+        // NanoC6: Use M5.Ex_I2C (m5::I2C_Class, not Arduino Wire)
+        M5_LOGI("Using M5.Ex_I2C");
+        unit_ready = Units.add(unit, M5.Ex_I2C) && Units.begin();
+    } else {
+        auto pin_num_sda = M5.getPin(m5::pin_name_t::port_a_sda);
+        auto pin_num_scl = M5.getPin(m5::pin_name_t::port_a_scl);
+        M5_LOGI("getPin: SDA:%u SCL:%u", pin_num_sda, pin_num_scl);
+        Wire.end();
+        Wire.begin(pin_num_sda, pin_num_scl, 400 * 1000U);
+        unit_ready = Units.add(unit, Wire) && Units.begin();
     }
 #endif
 
-    Wire.end();
-    M5_LOGI("getPin: SDA:%u SCL:%u", pin_num_sda, pin_num_scl);
-    Wire.begin(pin_num_sda, pin_num_scl, 400 * 1000U);
-    if (!Units.add(unit, Wire) || !Units.begin()) {
+    if (!unit_ready) {
         M5_LOGE("Failed to begin");
+        lcd.fillScreen(TFT_RED);
         while (true) m5::utility::delay(10000);
     }
 
-    M5_LOGI("M5UnitUnified has been begun");
+    M5_LOGI("M5UnitUnified initialized");
     M5_LOGI("%s", Units.debugInfo().c_str());
     M5_LOGI("ESP-IDF Version %d.%d.%d", (ESP_IDF_VERSION >> 16) & 0xFF, (ESP_IDF_VERSION >> 8) & 0xFF,
             ESP_IDF_VERSION & 0xFF);
@@ -899,8 +906,7 @@ void setup()
         M5_LOGE("readSerialNumber failed");
         while (true) m5::utility::delay(10000);
     }
-
-    // Display informations for provisioning
+    // Display information for provisioning
     if (!mqtt_uri || !mqtt_uri[0]) {
         print_provisioning(unit);
         M5.Log.printf("*** AWS endpoint is empty ***\n");
@@ -908,7 +914,10 @@ void setup()
     }
 
     // WiFi
+    M5_LOGI("Free heap before WiFi: %u / min: %u", ESP.getFreeHeap(), ESP.getMinFreeHeap());
     if (!connectWiFi()) {
+        M5_LOGE("connectWiFi failed!");
+        lcd.fillScreen(TFT_RED);
         while (true) m5::utility::delay(10000);
     }
     M5.Log.printf("WiFi connected!\n");
@@ -918,6 +927,7 @@ void setup()
     // TLS
     if (!connectTLS()) {
         M5_LOGE("connectTLS failed!");
+        lcd.fillScreen(TFT_RED);
         while (true) m5::utility::delay(10000);
     }
     M5_LOGI("TLS Connected");
@@ -943,7 +953,7 @@ void setup()
         mqtt_topic);
 
     M5.Speaker.tone(4000, 40);
-    lcd.clear(TFT_DARKGREEN);
+    lcd.fillScreen(TFT_DARKGREEN);
 }
 
 void loop()
@@ -955,7 +965,7 @@ void loop()
     if (!yieldMQTT(100)) {
         cleanupTLS();
         M5_LOGE("err");
-        lcd.clear(TFT_MAGENTA);
+        lcd.fillScreen(TFT_MAGENTA);
         while (true) m5::utility::delay(10000);
     }
 

@@ -16,7 +16,7 @@ See also https://aws-iot-kit-docs.m5stack.com/en/blinky-hello-world/prerequisite
 
 ### 2. Device Provisioning
 
-#### Build,Uplaod this example program
+#### Build, Upload this example program
 The unit's device certificate and serial number appear on the serial monitor.  
 **(Do not define/build options for AWS endpoints or others yet)**
 
