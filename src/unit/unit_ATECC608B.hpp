@@ -40,6 +40,7 @@ public:
     {
         auto ccfg  = component_config();
         ccfg.clock = 400 * 1000U;
+        // ccfg.clock = 100 * 1000U;
         component_config(ccfg);
     }
     virtual ~UnitATECC608B()
@@ -50,12 +51,12 @@ public:
 
     ///@name Settings for begin
     ///@{
-    /*! @brief Gets the configration */
+    /*! @brief Gets the configuration */
     inline config_t config()
     {
         return _cfg;
     }
-    //! @brief Set the configration
+    //! @brief Set the configuration
     inline void config(const config_t& cfg)
     {
         _cfg = cfg;
@@ -63,9 +64,9 @@ public:
     ///@}
 
     /*!
-      @brief Get the revison
+      @brief Get the revision
       @return uint8_t[4]
-      @warning Void if obtained before  begin()
+      @warning Void if obtained before begin()
      */
     inline const uint8_t* revision() const
     {
@@ -141,8 +142,8 @@ public:
       @param[out] valid ECC key is valid if true
       @param slot Slot
       @return True if successful
-      @warning For TNGTLS device, the keys stored in Slots 1-4 are ECC keys that can be checked with theKeyValid mode of
-      the Info command
+      @warning For TNGTLS device, the keys stored in Slots 1-4 are ECC keys that can be checked with the KeyValid mode
+      of the Info command
      */
     bool readKeyValid(bool& valid, const atecc608::Slot slot);
     /*!
@@ -150,7 +151,7 @@ public:
       @param[out] state Device status
       @return True if successful
       @note Status flags
-      |bit|name|decription|
+      |bit|name|description|
       |---|---|---|
       |15|TempKey.NoMacFlag| Valid if 1|
       |14|TempKey.GenKeyData| Valid if 1|
@@ -206,9 +207,10 @@ public:
     /*!
       @brief Read TRNG output
       @param[out] data Output value (At least 32 bytes)
+      @param[in] updateSeed If true, update the RNG seed (Mode=0x00); if false, suppress seed update (Mode=0x01)
       @return True if successful
      */
-    bool readRandomArray(uint8_t data[32], const bool updateSeed = true);
+    virtual bool readRandomArray(uint8_t data[32], const bool updateSeed = true);
     /*!
       @brief Generate a random value of type T in the specified range
       @tparam T Type of the value (must be an integral type)
@@ -229,7 +231,7 @@ public:
         }
 
         using U       = typename std::make_unsigned<T>::type;
-        const U range = static_cast<U>(upper - lower);
+        const U range = static_cast<U>(static_cast<U>(upper) - static_cast<U>(lower));
         const U limit = std::numeric_limits<U>::max() - (std::numeric_limits<U>::max() % range);
         uint8_t rv[32]{};
         uint_fast8_t offset{};
@@ -243,7 +245,7 @@ public:
                 memcpy(&raw, rv + offset, sizeof(U));
                 offset += sizeof(U);
 
-                if (raw > limit) {  // Rejection sampling
+                if (raw >= limit) {  // Rejection sampling
                     continue;
                 }
                 value = static_cast<T>(lower + (raw % range));
@@ -278,7 +280,7 @@ public:
         memcpy(&raw, rv, sizeof(uint32_t));  // use first 4 bytes
 
         // convert to [0.0, 1.0)
-        constexpr double norm = 1.0 / static_cast<double>(std::numeric_limits<uint32_t>::max());
+        constexpr double norm = 1.0 / (static_cast<double>(std::numeric_limits<uint32_t>::max()) + 1.0);
         double r              = static_cast<double>(raw) * norm;
         value                 = static_cast<T>(lower + r * static_cast<double>(upper - lower));
         return std::isfinite(value);
@@ -325,14 +327,14 @@ public:
     bool readSerialNumber(uint8_t sn[9]);
     /*!
       @brief Read the serial number as string
-      @param[out] str[9] Output buffer at least 19 bytes
+      @param[out] str[19] Output buffer at least 19 bytes
       @return True if successful
      */
     bool readSerialNumber(char str[19]);
 
     /*!
       @brief Read the lock state for zone
-      @param[out] configLocked Configurate zone
+      @param[out] configLocked Configure zone
       @param[out] dataLocked Data zone
       @return True if successful
      */
@@ -370,33 +372,38 @@ public:
       @brief Read the data zone
       @param[out] data Output buffer
       @param slot Slot
-      @patam len Buffer length
+      @param len Buffer length
       @return True if successful
-      @warning For TNGTLS Only read slot are Slot 5,8,10,11,12
+      @warning For TNGTLS, only slots 5, 8, 10, 11, and 12 are readable
     */
     bool readDataZone(uint8_t* data, const uint16_t len, const atecc608::Slot slot);
 
     /*!
+      @brief Write data to GeneralData slot (Slot 8, clear text)
+      @param data Input buffer
+      @param len Data length in bytes (32-byte aligned, clamped to fit within slot)
+      @param offset Byte offset within slot (must be 32-byte aligned)
+      @return True if successful
+      @warning Only Slot 8 (GeneralData) supports clear text write on TNGTLS
+      @warning offset and len must be 32-byte aligned
+     */
+    bool writeGeneralData(const uint8_t* data, const uint16_t len, const uint16_t offset = 0);
+    /*!
+      @brief Read data from GeneralData slot (Slot 8)
+      @param[out] data Output buffer
+      @param len Data length in bytes (32-byte aligned, clamped to fit within slot)
+      @param offset Byte offset within slot (must be 32-byte aligned)
+      @return True if successful
+      @warning offset and len must be 32-byte aligned
+     */
+    bool readGeneralData(uint8_t* data, const uint16_t len, const uint16_t offset = 0);
+
+    /*!
       @brief Read the OTP zone
-      @paran[out] Output buffer at least 64 bytes
+      @param[out] otp Output buffer at least 64 bytes
       @return True if successful
      */
     bool readOTPZone(uint8_t otp[64]);
-    ///@}
-
-    ///@name SelfTest
-    ///@{
-    /*!
-      @brief Self test
-      @param[out] resultBits The bit corresponding to a failed test is set
-      @param testBits Bits to be tested
-      @return True if successful
-      @note bits
-      |b[7:6]|b[5]|b[4]|b[3]|b[2]|b[1]|b[0]|
-      |---|---|---|---|---|---|---|
-      |00|SHA|AES|ECDH|EECDSA|0|RNG,DRBG|
-     */
-    bool selfTest(uint8_t resultBits, const uint8_t testBits = 0x3D /* All */);
     ///@}
 
     ///@name SHA256
@@ -438,7 +445,7 @@ public:
     ///@name ECDH
     ///@{
     /*!
-      @brief ECDH (Plane text)
+      @brief ECDH (Plain text)
       @param[out] out Shared Master Secret as clear text at least 32 bytes
       @param slot ECC private key source Slot
       @param pubKey Public key
@@ -475,7 +482,7 @@ public:
         return ecdh_no_output(ECDH_MODE_SRC_SLOT | ECDH_MODE_OUTPUT_TEMPKEY, m5::stl::to_underlying(slot), pubKey);
     }
     /*!
-      @brief ECDH (Plane text)
+      @brief ECDH (Plain text)
       @param[out] out Shared Master Secret as clear text at least 32 bytes
       @param pubKey Public key
       @return True if successful
@@ -501,7 +508,7 @@ public:
                                 pubKey);
     }
     /*!
-      @brief ECDH (Stored in to TempKey)
+      @brief ECDH (Stored in TempKey)
       @param pubKey Public key
       @return True if successful
       @note TempKey as its starting value for an ECDH command
@@ -563,7 +570,7 @@ public:
     /*!
       @brief Generate digest of a public key and stored in TempKey
       @param slot Public key slot
-      @param otherData Other data for use in digest calculations at leaset 3 byes (nullptrAllowed)
+      @param otherData Other data for use in digest calculations at least 3 bytes (nullptrAllowed)
       @return True if successful
       @warning For TNGTLS, a digest can be created from Slot 11
      */
@@ -574,7 +581,7 @@ public:
     ///@{
     /*!
       @brief Sign internal message
-      @param[out] signature Signature at least 64 butes
+      @param[out] signature Signature at least 64 bytes
       @param slot Slot of the private key to be used to sign the message
       @param src Message source
       @param includeSerial Serial number is included in the message digest calculation
@@ -590,7 +597,7 @@ public:
     }
     /*!
       @brief Sign external message
-      @param[out] signature Signature at least 64 butes
+      @param[out] signature Signature at least 64 bytes
       @param slot Private key slot used to sign the message
       @param src Message source
       @param includeSerial Serial number is included in the message digest calculation
@@ -624,7 +631,7 @@ public:
                       src);
     }
     /*!
-      @brief Verify the stored publick key
+      @brief Verify the stored public key
       @param[out] mac validating MAC output buffer if not nullptr
       @param signature Signature to be verified
       @param slot Slot containing the public key to be used for the verification
@@ -638,6 +645,21 @@ public:
         return verify(mac, VERIFY_MODE_STORED | (mac ? VERIFY_MODE_MAC : 0x00), m5::stl::to_underlying(slot), signature,
                       nullptr, src);
     }
+    ///@}
+
+    ///@name SelfTest
+    ///@{
+    /*!
+      @brief Self test
+      @param[out] resultBits The bit corresponding to a failed test is set
+      @param testBits Bits to be tested
+      @return True if successful
+      @note bits
+      |b[7:6]|b[5]|b[4]|b[3]|b[2]|b[1]|b[0]|
+      |---|---|---|---|---|---|---|
+      |00|SHA|AES|ECDH|EECDSA|0|RNG,DRBG|
+     */
+    bool selfTest(uint8_t& resultBits, const uint8_t testBits = 0x3D /* All */);
     ///@}
 
     // @todo UpdateExtra, Write, AES, CheckMac, GenDig, KDF, MAC command support

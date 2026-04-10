@@ -16,11 +16,14 @@ using namespace m5::unit::atecc608;
 using m5::unit::types::elapsed_time_t;
 
 namespace {
-constexpr uint8_t otp_608b_tngtls[] = {0x78, 0x36, 0x74, 0x6A, 0x75, 0x5A, 0x4D, 0x79, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+constexpr uint8_t otp_608b_tngtls[64] = {0x78, 0x36, 0x74, 0x6A, 0x75, 0x5A, 0x4D, 0x79,  //
+                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 inline bool is_ecdh_source_slot(const uint8_t m)
 {
@@ -87,22 +90,24 @@ bool is_valid_sign_internal_slot(const uint16_t slot)
 void set_issue_date(uint8_t* out, const CompCertAccessor::DateTime& issue_date)
 {
     if (out) {
-        char buf[14]{};
+        char buf[80]{};
         // format: "YYMMDDhhmmssZ" total 13 bytes (UTC time)
-        snprintf(buf, sizeof(buf), "%02u%02u%02u%02u%02u%02uZ", issue_date.tm_year % 100, issue_date.tm_mon + 1,
-                 issue_date.tm_mday, issue_date.tm_hour, issue_date.tm_min, issue_date.tm_sec);
-        memcpy(out, buf, 13);
+        auto len =
+            snprintf(buf, sizeof(buf), "%02d%02d%02d%02d%02d%02dZ", issue_date.tm_year % 100, issue_date.tm_mon + 1,
+                     issue_date.tm_mday, issue_date.tm_hour, issue_date.tm_min, issue_date.tm_sec);
+        memcpy(out, buf, len);
     }
 }
 
 void set_expire_date(uint8_t* out, const CompCertAccessor::DateTime& expire_date)
 {
     if (out) {
-        char buf[16]{};
+        char buf[80]{};
         // format: "YYYYMMDDhhmmssZ" total 15 bytes (Generalized time)
-        snprintf(buf, sizeof(buf), "%04u%02u%02u%02u%02u%02uZ", expire_date.tm_year + 1900, expire_date.tm_mon + 1,
-                 expire_date.tm_mday, expire_date.tm_hour, expire_date.tm_min, expire_date.tm_sec);
-        memcpy(out, buf, 15);
+        auto len =
+            snprintf(buf, sizeof(buf), "%04d%02d%02d%02d%02d%02dZ", expire_date.tm_year + 1900, expire_date.tm_mon + 1,
+                     expire_date.tm_mday, expire_date.tm_hour, expire_date.tm_min, expire_date.tm_sec);
+        memcpy(out, buf, len);
     }
 }
 
@@ -232,17 +237,37 @@ const char UnitATECC608B_TNGTLS::name[] = "UnitATECC608B_TNGTLS";
 const types::uid_t UnitATECC608B_TNGTLS::uid{"UnitATECC608B_TNGTLS"_mmh3};
 const types::attr_t UnitATECC608B_TNGTLS::attr{attribute::AccessI2C};
 
+bool UnitATECC608B_TNGTLS::readRandomArray(uint8_t data[32], const bool /*updateSeed*/)
+{
+    return UnitATECC608B::readRandomArray(data, true);
+}
+
 bool UnitATECC608B_TNGTLS::begin_impl()
 {
-    uint8_t otp[64]{};
-    // Check 608BTNGTLS
     const uint8_t* rev = revision();
-    if (!(rev[0] == 0x00 && rev[1] == 0x00 && rev[2] == 0x60 && rev[3] >= 0x03 && readOTPZone(otp) &&
-          memcmp(otp, otp_608b_tngtls, 64) == 0)) {
-        M5_LIB_LOGE("This is not 608BTNGTLS %02X:%02X:%02X:%02X", rev[0], rev[1], rev[2], rev[3]);
-        M5_DUMPE(otp, 64);
+    if (!(rev[0] == 0x00 && rev[1] == 0x00 && rev[2] == 0x60 && rev[3] >= 0x03)) {
+        M5_LIB_LOGE("This is not 608B %02X:%02X:%02X:%02X", rev[0], rev[1], rev[2], rev[3]);
         return false;
     }
+    // Device is awake from begin()'s single wakeup session — read OTP directly.
+    // Read as a single 32-byte block to minimize I2C transactions.
+    // On ESP32 (Core2AWS), each GPIO-based wakeup gives only ~6 usable transactions,
+    // so 4-byte×16 reads would exceed the budget.
+    // Only the first 8 bytes of OTP are non-zero for TNGTLS; bytes 8-63 are all 0x00.
+    uint8_t otp[32]{};
+    memset(otp, 0xFF, 32);
+
+    if (!read_data(otp, 32, ZONE_OTP, 0x0000)) {
+        M5_LIB_LOGE("Failed to read OTP");
+        return false;
+    }
+
+    // M5_DUMPI(otp, 32);
+    if (memcmp(otp, otp_608b_tngtls, 32) != 0) {
+        M5_LIB_LOGE("This is not 608BTNGTLS");
+        return false;
+    }
+
     return true;
 }
 
@@ -348,7 +373,7 @@ bool UnitATECC608B_TNGTLS::readDeviceCertificate(uint8_t* out, uint16_t& olen, c
     cert_sn[0] |= 0x40u;                        // Ensure the SN doesn't have any trimmable bytes
     memcpy(out + offset_cert_sn, cert_sn, 16);  // Top of 16 bytes
 
-    // Subkect key ID
+    // Subject key ID
     msg[0] = 0x04;
     memcpy(msg + 1, pubKey, 64);
     uint8_t key_id[20]{};
@@ -384,10 +409,10 @@ bool UnitATECC608B_TNGTLS::readDeviceCertificate(uint8_t* out, uint16_t& olen, c
         memcpy(pubKey + 32, pubKeyTmp + 4 + 32 + 4, 32);
         msg[0] = 0x04;
         memcpy(msg + 1, pubKey, 64);
-        uint8_t key_id[20]{};
-        m5::utility::SHA1::sha1(key_id, msg, 65);
+        uint8_t auth_key_id[20]{};
+        m5::utility::SHA1::sha1(auth_key_id, msg, 65);
 
-        memcpy(out + offset_auth_key_id, key_id, 20);
+        memcpy(out + offset_auth_key_id, auth_key_id, 20);
     }
     return true;
 }

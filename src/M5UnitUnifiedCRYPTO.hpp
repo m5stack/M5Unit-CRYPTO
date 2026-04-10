@@ -26,7 +26,7 @@ namespace m5 {
   @brief Unit-related namespace
  */
 namespace unit {
-//! @brief Alias for M5Stack's UnitID(SKU:U124) unit (internally uses ATECC680B-TNGTLS)
+//! @brief Alias for M5Stack's UnitID(SKU:U124) unit (internally uses ATECC608B-TNGTLS)
 using UnitID = m5::unit::UnitATECC608B_TNGTLS;
 
 }  // namespace unit
