@@ -8,8 +8,7 @@
   @brief ATECC608 definition
 */
 #include "atecc608.hpp"
-#include "utility/base64.hpp"
-#include <M5Utility.h>
+#include <M5Utility.hpp>
 
 namespace {
 
@@ -102,7 +101,7 @@ bool convertToPEM(char* out, const uint32_t olen, const uint8_t* der, uint32_t d
     }
 
     uint32_t written{};
-    // heaader
+    // header
     written += snprintf(out + written, olen - written, "-----BEGIN %s-----\n", header);
     // body
     uint32_t b64_written = m5::utility::encode_base64(out + written, olen - written, der, dlen, 64, false, true);

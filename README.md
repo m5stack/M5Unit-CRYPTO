@@ -38,6 +38,22 @@ See also [examples/UnitUnified](examples/UnitUnified)
 ### Ported from Blinky-Hello-World (SKU:K010-AWS)
 See also [examples/UnitUnified/UnitID/Blinky-Hello-World](examples/UnitUnified/UnitID/Blinky-Hello-World)
 
+### For ArduinoIDE settings
+If you use the built-in ATECC608B chip on **M5Stack Core2 for AWS (SKU:K010-AWS)**,
+you must enable the define symbol below.
+(Rewrite source or specify with compile options)
+
+- PlotToSerial / Blinky-Hello-World
+```cpp
+// *************************************************************
+// Uncomment if using the built-in ATECC608B on Core2 for AWS
+// *************************************************************
+#if !defined(USING_M5CORE2_AWS_BUILTIN)
+// For Core2 for AWS built-in ATECC608B (K010-AWS)
+// #define USING_M5CORE2_AWS_BUILTIN
+#endif
+```
+
 
 ## Doxygen document
 [GitHub Pages](https://m5stack.github.io/M5Unit-CRYPTO/)

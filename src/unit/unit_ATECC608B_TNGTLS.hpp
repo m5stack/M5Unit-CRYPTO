@@ -16,7 +16,7 @@ namespace m5 {
 namespace unit {
 
 /*!
-  @class m5::unit::UnitATECC608B
+  @class m5::unit::UnitATECC608B_TNGTLS
   @brief ATECC608B-TNGTLS unit
 */
 class UnitATECC608B_TNGTLS : public UnitATECC608B {
@@ -30,12 +30,25 @@ public:
     {
     }
 
+    ///@name Random
+    ///@{
+    /*!
+      @brief Read TRNG output
+      @param[out] data Output value (At least 32 bytes)
+      @param[in] updateSeed Ignored. ATECC608B-TNGTLS only supports Mode=0x00 (UPDATE_SEED).
+      @return True if successful
+      @warning The @p updateSeed parameter is not supported on ATECC608B-TNGTLS (DS40002250A Table 5-19).
+      The RNG seed is always updated regardless of this argument.
+     */
+    bool readRandomArray(uint8_t data[32], const bool updateSeed = true) override;
+    ///@}
+
     ///@name Certificate
     ///@{
     /*!
       @brief Read the device certificate (DER)
       @param[out] out Output buffer
-      @param[in/out] in:Output buffer length out:Length of output to buffer
+      @param[in,out] in:Output buffer length out:Length of output to buffer
       @param fillAuthKeyId Fill auth key id from signer if true
       @return True if successful
      */
@@ -43,7 +56,7 @@ public:
     /*!
       @brief Read the signer certificate (DER)
       @param[out] out Output buffer
-      @param[in/out] in:Output buffer length out:Length of output to buffer
+      @param[in,out] in:Output buffer length out:Length of output to buffer
       @return True if successful
      */
     bool readSignerCertificate(uint8_t* out, uint16_t& olen);

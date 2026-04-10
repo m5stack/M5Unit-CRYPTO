@@ -21,7 +21,7 @@ namespace unit {
 namespace atecc608 {
 /*!
   @enum Slot
-  @brief Slot configuration summay
+  @brief Slot configuration summary
  */
 enum class Slot : uint8_t {
     PrimaryPrivateKey,            //!< Primary authentication key
@@ -49,7 +49,7 @@ enum class Source : uint8_t {
     TempKey,             //!< TempKey
     MsgDigestBuffer,     //!< Message digest buffer
     AlternateKeyBuffer,  //!< Alternate Key Buffer
-    ExternalBuffer,      //!< Any  buffer
+    ExternalBuffer,      //!< Any buffer
 };
 /*!
   @enum Destination
@@ -84,7 +84,7 @@ enum Error : uint8_t {
 ///@name Delay time between send and receive
 ///@{
 constexpr uint32_t DELAY_READ{3};
-constexpr uint32_t DELAY_WRITE{4};
+constexpr uint32_t DELAY_WRITE{45};
 constexpr uint32_t DELAY_INFO{2};
 constexpr uint32_t DELAY_NONCE{16};
 constexpr uint32_t DELAY_SELFTEST{200};
@@ -94,21 +94,21 @@ constexpr uint32_t DELAY_GENKEY{115};
 constexpr uint32_t DELAY_SIGN{70};
 constexpr uint32_t DELAY_SHA{9};
 constexpr uint32_t DELAY_ECDH{58};
-constexpr uint32_t DELAY_VERIFY{105};
+constexpr uint32_t DELAY_VERIFY{120};
 ///@}
 
 ///@name Word address
 ///@{
 constexpr uint8_t WORD_VALUE_RESET{0x00};
-constexpr uint8_t WORD_ADRESS_VALUE_SLEEP{0x01};
-constexpr uint8_t WORD_ADRESS_VALUE_IDLE{0x02};
-constexpr uint8_t WORD_ADRESS_VALUE_COMMAND{0x03};
+constexpr uint8_t WORD_ADDRESS_VALUE_SLEEP{0x01};
+constexpr uint8_t WORD_ADDRESS_VALUE_IDLE{0x02};
+constexpr uint8_t WORD_ADDRESS_VALUE_COMMAND{0x03};
 ///@}
 
 ///@name Operation code
 ///@{
 constexpr uint8_t OPCODE_READ{0x02};
-// constexpr uint8_t OPCODE_WRITE{0x12};
+constexpr uint8_t OPCODE_WRITE{0x12};
 constexpr uint8_t OPCODE_NONCE{0x16};
 // constexpr uint8_t OPCODE_LOCK{0x17};
 constexpr uint8_t OPCODE_RANDOM{0x1B};
@@ -189,6 +189,7 @@ constexpr uint8_t SIGN_MODE_EXTERNAL{0x80};
 
 constexpr uint8_t SIGN_MODE_TEMPKEY{0x00};
 constexpr uint8_t SIGN_MODE_DIGEST{0x20};
+///@}
 
 ///@name Verify
 ///@{
@@ -210,7 +211,7 @@ inline uint16_t offset_to_param2_for_config(const uint8_t offset)
     return (block << 3) | index;
 }
 //! @brief Conversion slot and block to address for Data zone
-inline uint16_t slot_block_to_param2(const uint8_t slot, const uint8_t offset)
+inline uint16_t slot_block_to_param2(const uint8_t slot, const uint16_t offset)
 {
     const uint8_t block       = offset >> 5;         // 0〜2
     const uint8_t word_offset = (offset & 31) >> 2;  // 0〜7
@@ -234,7 +235,7 @@ extern const uint32_t template_for_device_size;
 extern const uint32_t template_for_signer_size;
 ///@endcond
 
-/*1
+/*!
   @class m5::unit::atecc608::CompCertAccessor
   @brief Compressed certificate accessor
  */
@@ -359,4 +360,59 @@ private:
 }  // namespace atecc608
 }  // namespace unit
 }  // namespace m5
+#endif
+
+#if 0
+7:01:52.557 > [   899][E][unit_ATECC608B.cpp:1186] receive_response(): CRC error: C76B != FFFF (count:35 max_read:35)
+17:01:52.563 > DUMP:0x3ffb2080 35 bytes
+17:01:52.572 > 0x3ffb2080| 23 8F 0F 8F 8F 0F 0F 8F 0F 0F 8F 0F 8F 0F 8F 8F |#...............
+17:01:52.578 > 0x3ffb2090| 8F 8F 8F 9F FF FF FF FF FF FF FF FF FF FF FF FF |................
+17:01:52.583 > 0x3ffb20a0| FF FF FF                                        |...
+17:01:52.589 > [   923][E][PlotToSerial.cpp:237] setup(): readConfigZone NG
+17:01:52.590 > [   936][E][unit_ATECC608B.cpp:1210] read_data(): Failed send_command:01 0002
+17:01:52.596 > [   941][E][PlotToSerial.cpp:242] setup(): readOTPZone NG
+17:01:52.607 > [   941][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
+17:01:52.620 > [   962][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 1 err:-5 resp:00,00,00,00
+17:01:52.631 > [   972][E][unit_ATECC608B.cpp:1186] receive_response(): CRC error: 2C9E != FFFF (count:35 max_read:35)
+17:01:52.637 > DUMP:0x3ffb1ed0 35 bytes
+17:01:52.646 > 0x3ffb1ed0| 23 07 31 00 64 FE AF 6E A0 7A 2F F5 96 55 AA 6B |#.1.d..n.z/..U.k
+17:01:52.652 > 0x3ffb1ee0| 11 AF 44 A3 1E DF DD 2E 57 E3 96 F0 FF FF FF FF |..D.....W.......
+17:01:52.657 > 0x3ffb1ef0| FF FF FF                                        |...
+17:01:52.663 > [   997][E][PlotToSerial.cpp:247] setup(): readDataZone NG
+17:01:52.671 > [  1013][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.677 > [  1018][E][PlotToSerial.cpp:253] setup(): readKeyValid[1] NG
+17:01:52.682 > [  1022][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.688 > [  1027][E][PlotToSerial.cpp:253] setup(): readKeyValid[2] NG
+17:01:52.693 > [  1040][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
+17:01:52.705 > [  1048][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.710 > [  1053][E][PlotToSerial.cpp:253] setup(): readKeyValid[4] NG
+17:01:52.716 > [  1057][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.727 > [  1062][E][PlotToSerial.cpp:253] setup(): readKeyValid[5] NG
+17:01:52.732 > [  1071][E][unit_ATECC608B.cpp:1186] receive_response(): CRC error: 0F0E != FFFF (count:7 max_read:7)
+17:01:52.738 > DUMP:0x3ffb1f30 7 bytes
+17:01:52.747 > 0x3ffb1f30| 07 00 00 0F FF FF FF                            |.......
+17:01:52.753 > [  1086][E][PlotToSerial.cpp:253] setup(): readKeyValid[6] NG
+17:01:52.760 > [  1104][E][PlotToSerial.cpp:253] setup(): readKeyValid[8] NG
+17:01:52.765 > [  1104][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
+17:01:52.771 > [  1113][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.776 > [  1118][E][PlotToSerial.cpp:253] setup(): readKeyValid[9] NG
+17:01:52.787 > [  1129][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
+17:01:52.793 > [  1138][E][PlotToSerial.cpp:253] setup(): readKeyValid[11] NG
+17:01:52.798 > [  1138][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
+17:01:52.810 > [  1150][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.815 > [  1155][E][PlotToSerial.cpp:253] setup(): readKeyValid[12] NG
+17:01:52.821 > [  1162][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.832 > [  1167][E][PlotToSerial.cpp:253] setup(): readKeyValid[13] NG
+17:01:52.837 > [  1176][E][unit_ATECC608B.cpp:1186] receive_response(): CRC error: 2552 != 0000 (count:31 max_read:7)
+17:01:52.843 > DUMP:0x3ffb1f30 7 bytes
+17:01:52.852 > 0x3ffb1f30| 1F FF FF FF FF FF FF                            |.......
+17:01:52.858 > [  1191][E][PlotToSerial.cpp:253] setup(): readKeyValid[14] NG
+17:01:52.866 > [  1208][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.872 > [  1213][E][PlotToSerial.cpp:259] setup(): readCounter(0) NG
+17:01:52.877 > [  1218][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.883 > [  1223][E][PlotToSerial.cpp:262] setup(): readCounter(1) NG
+17:01:52.888 > [  1230][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:52.900 > [  1235][E][PlotToSerial.cpp:267] setup(): readDeviceState NG
+17:01:53.099 > [  1441][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
+17:01:53.105 > [  1446][E][PlotToSerial.cpp:272] setup(): selfTest NG
 #endif
