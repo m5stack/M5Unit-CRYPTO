@@ -8,10 +8,10 @@ on:
     branches:
       - '*'
     paths:
-      - 'src/unit/**.cpp'
-      - 'src/unit/**.hpp'
-      - 'src/unit/**.h'
-      - 'src/unit/**.c'
+      - 'src/**.cpp'
+      - 'src/**.hpp'
+      - 'src/**.h'
+      - 'src/**.c'
       - 'test/**.cpp'
       - 'test/**.hpp'
       - 'test/**.h'
@@ -21,14 +21,14 @@ on:
       - 'examples/UnitUnified/**.hpp'
       - 'examples/UnitUnified/**.h'
       - 'examples/UnitUnified/**.c'
-      - '/platformio-build-check.yml'
-      - '**platformio.ini'
+      - '.github/workflows/platformio-build-check.yml'
+      - 'platformio.ini'
   pull_request:
     paths:
-      - 'src/unit/**.cpp'
-      - 'src/unit/**.hpp'
-      - 'src/unit/**.h'
-      - 'src/unit/**.c'
+      - 'src/**.cpp'
+      - 'src/**.hpp'
+      - 'src/**.h'
+      - 'src/**.c'
       - 'test/**.cpp'
       - 'test/**.hpp'
       - 'test/**.h'
@@ -38,8 +38,8 @@ on:
       - 'examples/UnitUnified/**.hpp'
       - 'examples/UnitUnified/**.h'
       - 'examples/UnitUnified/**.c'
-      - '**/platformio-build-check.yml'
-      - '**platformio.ini'
+      - '.github/workflows/platformio-build-check.yml'
+      - 'platformio.ini'
   workflow_dispatch:
 
 defaults:
@@ -54,12 +54,12 @@ jobs:
   build:
     name: ${{ matrix.unit }}:${{ matrix.example }}@${{ matrix.board }}:${{ matrix.framework }}:${{ matrix.espressif32 }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
 
     strategy:
       fail-fast: false
-      #max-parallel: 1
-      
+      max-parallel: 20
+
       matrix:
         example:
           - PlotToSerial
@@ -74,53 +74,24 @@ jobs:
           - Fire
           - StampS3
           - Dial
-          - AtomMatrix
+          - Atom
           - AtomS3
           - AtomS3R
           - NanoC6
           - StickCPlus
           - StickCPlus2
+          - StickS3
           - Paper
           - CoreInk
+          - Cardputer
+          - Tab5
+          - NessoN1
 
         framework:
           - Arduino
 
         espressif32:
           - latest
-#          - '5_4_0'
-#          - '4_4_0'
-
-#        exclude:
-#          - board: CoreS3
-#            espressif32: '5_4_0'
-#          - board: CoreS3
-#            espressif32: '4_4_0'
-#          - board: StampS3
-#            espressif32: '5_4_0'
-#          - board: StampS3
-#            espressif32: '4_4_0'
-#          - board: AtomS3
-#            espressif32: '5_4_0'
-#          - board: AtomS3
-#            espressif32: '4_4_0'
-#          - board: Dial
-#            espressif32: '5_4_0'
-#          - board: Dial
-#            espressif32: '4_4_0'
-#          - board: NanoC6
-#            espressif32: '5_4_0'
-#          - board: NanoC6
-#            espressif32: '4_4_0'
-#          - board: StickCPlus
-#            espressif32: '5_4_0'
-#          - board: StickCPlus
-#            espressif32: '4_4_0'
-#          - board: Paper
-#            espressif32: '5_4_0'
-#          - board: Paper
-#            espressif32: '4_4_0'
-
 
         include:
           # Specific examples
@@ -129,12 +100,29 @@ jobs:
             espressif32: latest
             unit: UnitID
             board: Core
+          # Builtin ATECC608B (Core2 for AWS)
+          - example: PlotToSerial
+            unit: BultinATECC608
+            board: Core2
+            framework: Arduino
+            espressif32: latest
+          - example: Blinky-Hello-World
+            unit: BultinATECC608
+            board: Core2
+            framework: Arduino
+            espressif32: latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          python-version: '3.10'
+
+      - name: Install intelhex
+        run: pip install intelhex
 
       - name: Build examples
         uses: karniv00l/platformio-run-action@v1

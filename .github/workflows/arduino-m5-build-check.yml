@@ -12,28 +12,28 @@ on:
     branches:
       - '*'
     paths:
-      - 'src/unit/**.cpp'
-      - 'src/unit/**.hpp'
-      - 'src/unit/**.h'
-      - 'src/unit/**.c'
+      - 'src/**.cpp'
+      - 'src/**.hpp'
+      - 'src/**.h'
+      - 'src/**.c'
       - 'examples/UnitUnified/**.ino'
       - 'examples/UnitUnified/**.cpp'
       - 'examples/UnitUnified/**.hpp'
       - 'examples/UnitUnified/**.h'
       - 'examples/UnitUnified/**.c'
-      - '**arduino-m5-build-check.yml'
+      - '.github/workflows/arduino-m5-build-check.yml'
   pull_request:
     paths:
-      - 'src/unit/**.cpp'
-      - 'src/unit/**.hpp'
-      - 'src/unit/**.h'
-      - 'src/unit/**.c'
+      - 'src/**.cpp'
+      - 'src/**.hpp'
+      - 'src/**.h'
+      - 'src/**.c'
       - 'examples/UnitUnified/**.ino'
       - 'examples/UnitUnified/**.cpp'
       - 'examples/UnitUnified/**.hpp'
       - 'examples/UnitUnified/**.h'
       - 'examples/UnitUnified/**.c'
-      - '**arduino-m5-build-check.yml'
+      - '.github/workflows/arduino-m5-build-check.yml'
   workflow_dispatch:
 
 defaults:
@@ -48,28 +48,32 @@ jobs:
   build:
     name: ${{ matrix.unit }}:${{ matrix.sketch }}:${{matrix.board}}@${{matrix.platform-version}}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
 
     strategy:
       fail-fast: false
-#      max-parallel: 1
+      max-parallel: 20
       matrix:
         platform-url:
           - https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/arduino/package_m5stack_index.json
 
         sketch:
           - PlotToSerial
-          - Blinky-Hello-World
+
+        build-properties:
+          - ""
 
         unit:
           - UnitID
 
         board:
+          - arduino_nesso_n1
           - m5stack_atom
           - m5stack_atoms3
           - m5stack_atoms3r
           - m5stack_capsule
-#          - m5stack_cardputer
+          - m5stack_cardputer
+#          - m5stack_chain_dualkey
           - m5stack_core
           - m5stack_core2
           - m5stack_coreink
@@ -77,22 +81,30 @@ jobs:
           - m5stack_dial
           - m5stack_dinmeter
           - m5stack_fire
+          - m5stack_nano_c6
+#          - m5stack_nano_h2
           - m5stack_paper
+          - m5stack_papers3
 #          - m5stack_poe_cam
+#          - m5stack_powerhub
 #          - m5stack_stamp_c3
 #          - m5stack_stamp_pico
           - m5stack_stamp_s3
+#          - m5stack_stamplc
 #          - m5stack_station
-#          - m5stack_stickc
+          - m5stack_stickc
           - m5stack_stickc_plus
           - m5stack_stickc_plus2
+          - m5stack_sticks3
+          - m5stack_tab5
 #          - m5stack_timer_cam
 #          - m5stack_tough
+#          - m5stack_unit_c6l
 #          - m5stack_unit_cam
 #          - m5stack_unit_cams3
 
         platform-version:
-          - 2.1.2
+          - 3.2.5
 
         platform:
           - m5stack
@@ -100,24 +112,61 @@ jobs:
         archi:
           - esp32
 
+        include:
+          # External ATECC608B: Blinky-Hello-World on Core only
+          - sketch: Blinky-Hello-World
+            unit: UnitID
+            build-properties: ""
+            platform-url: https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/arduino/package_m5stack_index.json
+            platform: m5stack
+            archi: esp32
+            platform-version: 3.2.5
+            board: m5stack_core
+          # Builtin ATECC608B (Core2 for AWS)
+          - sketch: PlotToSerial
+            unit: UnitID
+            build-properties: "-DUSING_M5CORE2_AWS_BUILTIN"
+            platform-url: https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/arduino/package_m5stack_index.json
+            platform: m5stack
+            archi: esp32
+            platform-version: 3.2.5
+            board: m5stack_core2
+          - sketch: Blinky-Hello-World
+            unit: UnitID
+            build-properties: "-DUSING_M5CORE2_AWS_BUILTIN"
+            platform-url: https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/arduino/package_m5stack_index.json
+            platform: m5stack
+            archi: esp32
+            platform-version: 3.2.5
+            board: m5stack_core2
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
-      # Build 
+      - name: Prepare libraries list
+        id: libs
+        run: |
+          {
+            echo "yaml<<EOF"
+            echo "$REQUIRED_LIBRARIES" | tr ',' '\n' | while read -r lib; do
+              echo "- name: $lib"
+            done
+            echo "- source-path: ./"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Compile examples
-        uses: ArminJo/arduino-test-compile@master
+        uses: arduino/compile-sketches@v1
         with:
-          arduino-board-fqbn: ${{ matrix.platform }}:${{ matrix.archi }}:${{ matrix.board }}
-          arduino-platform: ${{ matrix.platform }}:${{ matrix.archi }}@${{ matrix.platform-version }}
-          platform-url: ${{ matrix.platform-url }}
-          required-libraries: ${{ env.REQUIRED_LIBRARIES }}
-          extra-arduino-cli-args: ${{ matrix.cli-args }}
-          #build-properties: ${{ toJson(matrix.build-properties) }}
-          sketch-names: ${{ matrix.sketch }}.ino
-          sketch-names-find-start: ${{ env.SKETCH_NAMES_FIND_START }}/${{ matrix.unit }}
-          #sketches-exclude: ${{ matrix.sketches-exclude }}
-
+          fqbn: ${{ matrix.platform }}:${{ matrix.archi }}:${{ matrix.board }}
+          platforms: |
+            - name: ${{ matrix.platform }}:${{ matrix.archi }}
+              source-url: ${{ matrix.platform-url }}
+              version: ${{ matrix.platform-version }}
+          libraries: ${{ steps.libs.outputs.yaml }}
+          sketch-paths: |
+            - ${{ env.SKETCH_NAMES_FIND_START }}/${{ matrix.unit }}/${{ matrix.sketch }}
+          cli-compile-flags: |
+            - --build-property
+            - build.extra_flags=${{ matrix.build-properties }}
