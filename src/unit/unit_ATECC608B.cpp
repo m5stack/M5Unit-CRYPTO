@@ -126,6 +126,7 @@ bool UnitATECC608B::wakeup()
     for (uint_fast8_t retry = 0; retry < 3; ++retry) {
         // GPIO SDA pulse wakeup (no general call — avoids affecting other devices)
         m5::utility::delay(1);
+        selectChannel(channel());  // Route the SDA wake pulse through PaHub to this unit's channel
 
         gpio::pin_backup_t sda_backup(sda_pin);
         gpio::pin_backup_t scl_backup(scl_pin);
