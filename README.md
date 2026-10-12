@@ -54,6 +54,13 @@ you must enable the define symbol below.
 #endif
 ```
 
+## Support via [PaHub](https://docs.m5stack.com/en/unit/Unit-PaHub%20v2.1)
+
+|Unit|Support|Note|
+|---|---|---|
+|UnitID|OK||
+
+See also the [ViaPaHub](examples/UnitUnified/UnitID/ViaPaHub) example and [M5Unit-HUB](https://github.com/m5stack/M5Unit-HUB)
 
 ## Doxygen document
 [GitHub Pages](https://m5stack.github.io/M5Unit-CRYPTO/)

@@ -96,6 +96,31 @@ jobs:
 
         include:
           # Specific examples
+          - example: ViaPaHub
+            framework: Arduino
+            espressif32: latest
+            unit: UnitID
+            board: Core
+          - example: ViaPaHub
+            framework: Arduino
+            espressif32: latest
+            unit: UnitID
+            board: CoreS3
+          - example: ViaPaHub
+            framework: Arduino
+            espressif32: latest
+            unit: UnitID
+            board: NanoC6
+          - example: ViaPaHub
+            framework: Arduino
+            espressif32: latest
+            unit: UnitID
+            board: NanoH2
+          - example: ViaPaHub
+            framework: Arduino
+            espressif32: latest
+            unit: UnitID
+            board: Tab5
           - example: Blinky-Hello-World
             framework: Arduino
             espressif32: latest
