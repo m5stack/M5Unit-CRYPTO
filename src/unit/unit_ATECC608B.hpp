@@ -14,6 +14,7 @@
 #include <M5UnitComponent.hpp>
 #include <m5_utility/container/circular_buffer.hpp>
 #include <array>
+#include <cmath>
 #include <limits>
 
 namespace m5 {

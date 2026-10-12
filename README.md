@@ -54,6 +54,27 @@ you must enable the define symbol below.
 #endif
 ```
 
+### For ESP-IDF settings
+PlotToSerial and ViaPaHub can be built with ESP-IDF (>= 5.1).
+To use the built-in ATECC608B on **M5Stack Core2 for AWS (SKU:K010-AWS)** in PlotToSerial, choose it in menuconfig.
+
+```sh
+cd examples/UnitUnified/UnitID/PlotToSerial
+idf.py set-target esp32
+idf.py menuconfig
+# -> M5Unit-CRYPTO example -> Target unit -> choose ONE:
+#      UnitID (U124, ATECC608B-TNGTLS / GROVE)
+#      Core2 for AWS built-in ATECC608B (K010-AWS)   (esp32 only)
+idf.py build flash monitor
+```
+
+ViaPaHub has no variant; run `idf.py set-target <chip>` and `idf.py build flash monitor`.
+
+> [!NOTE]
+> With ESP-IDF 5.2 or later, waking the ATECC608B on boards whose GROVE port uses a new I2C master bus
+> (CoreS3, Core2 port A, AtomS3, StampS3, StickC series, Tab5, ...) requires M5UnitUnified 0.6.1 or later.
+> Core, NanoC6, NanoH2, NessoN1 and the Core2 for AWS built-in chip work with the current release.
+
 ## Support via [PaHub](https://docs.m5stack.com/en/unit/Unit-PaHub%20v2.1)
 
 |Unit|Support|Note|

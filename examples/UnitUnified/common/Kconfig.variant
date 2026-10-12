@@ -1,0 +1,20 @@
+# "Target unit" selection for the UnitID examples (ESP-IDF).
+# rsource'd from <Example>/main/Kconfig.projbuild. The chosen CONFIG_EXAMPLE_USING_* is mapped
+# to the source-level USING_* macro in common/variant.cmake (shared with the Arduino build).
+menu "M5Unit-CRYPTO example"
+
+choice EXAMPLE_CRYPTO_VARIANT
+    prompt "Target unit"
+    default EXAMPLE_USING_UNIT_ID
+    help
+        Which ATECC608B this example drives.
+
+    config EXAMPLE_USING_UNIT_ID
+        bool "UnitID (U124, ATECC608B-TNGTLS / GROVE)"
+    config EXAMPLE_USING_M5CORE2_AWS_BUILTIN
+        bool "Core2 for AWS built-in ATECC608B (K010-AWS)"
+        # Core2 for AWS is an ESP32 board
+        depends on IDF_TARGET_ESP32
+endchoice
+
+endmenu

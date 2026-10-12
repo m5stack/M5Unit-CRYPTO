@@ -9,8 +9,9 @@
 */
 #include "unit_ATECC608B.hpp"
 #include <M5Utility.hpp>
-#if defined(ARDUINO)
 #include <driver/gpio.h>
+#if defined(ARDUINO)
+#include <Wire.h>
 #endif
 
 using namespace m5::utility::mmh3;
@@ -56,6 +57,7 @@ bool UnitATECC608B::begin()
     // (8-byte header + up to 155 bytes data: 64-byte signature + 64-byte pubKey + ...).
     // Arduino Wire's default TX buffer is 128 bytes, which silently truncates larger writes,
     // causing CRC mismatch and device timeout.  Expand the buffer when using Arduino Wire.
+#if defined(ARDUINO)
     auto ad = asAdapter<AdapterI2C>(Adapter::Type::I2C);
     if (ad && ad->implType() == AdapterI2C::ImplType::TwoWire) {
         constexpr size_t REQUIRED_BUF_SIZE{256};
@@ -65,6 +67,7 @@ bool UnitATECC608B::begin()
             M5_LIB_LOGI("Wire TX buffer expanded to %u", REQUIRED_BUF_SIZE);
         }
     }
+#endif
 
     if (!wakeup()) {
         M5_LIB_LOGE("Failed to wakeup");
