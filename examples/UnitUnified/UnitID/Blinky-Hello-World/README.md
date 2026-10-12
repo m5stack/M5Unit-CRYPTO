@@ -146,6 +146,20 @@ build_flags = ${option_release.build_flags}
   -DEXAMPLE_MQTT_URI="\"exampleexample-ats.iot.region.amazonaws.com\""
 ```
 
+#### ESP-IDF
+ESP-IDF 5.x (>= 5.1) on a Wi-Fi capable chip (esp32 / esp32s3 / esp32c3 / esp32c5 / esp32c6).  
+ESP-IDF 6.x is not supported yet (it ships mbedtls 4).  
+Set the Wi-Fi and AWS IoT settings in menuconfig.
+
+```sh
+cd examples/UnitUnified/UnitID/Blinky-Hello-World
+idf.py set-target esp32
+idf.py menuconfig
+# -> M5Unit-CRYPTO example -> Target unit -> UnitID or Core2 for AWS built-in ATECC608B (esp32 only)
+# -> Blinky-Hello-World settings -> Wi-Fi SSID / Wi-Fi password / AWS IoT endpoint / AWS IoT port
+idf.py build flash monitor
+```
+
 ### 4. Upload & Monitor
 Build and upload program.  
 If the connection is successful, the following log will be output to the serial monitor

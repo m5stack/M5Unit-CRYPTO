@@ -12,7 +12,27 @@
 #include <M5Utility.h>
 #include <wiring/m5_unit_unified_wiring.hpp>  // Board-aware connection helpers (include last)
 
+#include <esp_system.h>
+#if defined(ARDUINO)
 #include <WiFi.h>
+#else
+#include <algorithm>
+#include <cstring>
+#include <esp_event.h>
+#include <esp_netif.h>
+#include <esp_wifi.h>
+#include <freertos/event_groups.h>
+#include <nvs_flash.h>
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+// ESP-IDF 6 ships mbedtls 4 (PSA crypto): ctr_drbg / entropy are gone and mbedtls_pk_info_t, used to sign
+// with the ATECC608B, is no longer customizable
+#error "This example supports ESP-IDF 5.x (ESP-IDF 6 ships mbedtls 4, which this example does not support yet)"
+#endif
+#if !CONFIG_SOC_WIFI_SUPPORTED
+#error "This example needs a Wi-Fi capable target (esp32 / esp32s3 / esp32c3 / esp32c5 / esp32c6)"
+#endif
+#endif
 
 #include <mbedtls/ssl.h>
 #include <mbedtls/net_sockets.h>
@@ -35,6 +55,22 @@ namespace {
 // Enable this define when using M5Core2AWS's built-in chip
 #if !defined(USING_M5CORE2_AWS_BUILTIN)
 // #define USING_M5CORE2_AWS_BUILTIN
+#endif
+
+// ESP-IDF: the settings come from menuconfig (main/Kconfig.projbuild)
+#if !defined(ARDUINO)
+#if !defined(EXAMPLE_SSID)
+#define EXAMPLE_SSID CONFIG_EXAMPLE_WIFI_SSID
+#endif
+#if !defined(EXAMPLE_PASSWORD)
+#define EXAMPLE_PASSWORD CONFIG_EXAMPLE_WIFI_PASSWORD
+#endif
+#if !defined(EXAMPLE_MQTT_URI)
+#define EXAMPLE_MQTT_URI CONFIG_EXAMPLE_MQTT_URI
+#endif
+#if !defined(EXAMPLE_MQTT_PORT)
+#define EXAMPLE_MQTT_PORT CONFIG_EXAMPLE_MQTT_PORT
+#endif
 #endif
 
 #if !defined(EXAMPLE_SSID)
@@ -293,6 +329,7 @@ int custom_sign_callback(custom_sign_ctx_t ctx, mbedtls_md_type_t md_alg, const 
     return 0;  // OK
 }
 
+#if defined(ARDUINO)
 bool connectWiFi()
 {
     // Tab5 (ESP32-P4) uses ESP32-C6 co-processor for WiFi via SDIO; set pins before WiFi.begin()
@@ -327,6 +364,77 @@ bool connectWiFi()
     }
     return false;
 }
+#else
+EventGroupHandle_t wifi_events{};
+constexpr EventBits_t WIFI_CONNECTED_BIT{BIT0};
+constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS{5000};  // Same as the Arduino version (10 x 500 ms)
+
+void on_wifi_event(void *, esp_event_base_t base, int32_t id, void *)
+{
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        // Keep reconnecting, like the auto reconnect of Arduino WiFi
+        xEventGroupClearBits(wifi_events, WIFI_CONNECTED_BIT);
+        esp_wifi_connect();
+    } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+        xEventGroupSetBits(wifi_events, WIFI_CONNECTED_BIT);
+    }
+}
+
+bool connectWiFi()
+{
+    // Wi-Fi keeps its calibration data and the stored station config in NVS
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase();
+        err = nvs_flash_init();
+    }
+    if (err != ESP_OK) {
+        M5_LOGE("nvs_flash_init failed %d", err);
+        return false;
+    }
+
+    wifi_events = xEventGroupCreate();
+    err         = esp_event_loop_create_default();
+    if (!wifi_events || esp_netif_init() != ESP_OK || (err != ESP_OK && err != ESP_ERR_INVALID_STATE)) {
+        M5_LOGE("Failed to initialize the network stack");
+        return false;
+    }
+    esp_netif_create_default_wifi_sta();
+
+    wifi_init_config_t init_cfg = WIFI_INIT_CONFIG_DEFAULT();
+    if (esp_wifi_init(&init_cfg) != ESP_OK ||
+        esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi_event, nullptr, nullptr) != ESP_OK ||
+        esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_wifi_event, nullptr, nullptr) != ESP_OK ||
+        esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK) {
+        M5_LOGE("Failed to initialize Wi-Fi");
+        return false;
+    }
+
+    if (ssid && ssid[0] && password && password[0]) {
+        M5_LOGI("Use ssid:%s and password", ssid);
+        wifi_config_t cfg{};
+        memcpy(cfg.sta.ssid, ssid, std::min(strlen(ssid), sizeof(cfg.sta.ssid)));
+        memcpy(cfg.sta.password, password, std::min(strlen(password), sizeof(cfg.sta.password) - 1));
+        if (esp_wifi_set_config(WIFI_IF_STA, &cfg) != ESP_OK) {
+            M5_LOGE("esp_wifi_set_config failed");
+            return false;
+        }
+    } else {
+        // The station config stored in NVS by an earlier connection
+        M5_LOGI("Use inner credential");
+    }
+    if (esp_wifi_start() != ESP_OK) {
+        M5_LOGE("esp_wifi_start failed");
+        return false;
+    }
+
+    const EventBits_t bits =
+        xEventGroupWaitBits(wifi_events, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
+    return (bits & WIFI_CONNECTED_BIT) != 0;
+}
+#endif
 
 bool init_pk(mbedtls_pk_context *pkey)
 {
@@ -877,7 +985,8 @@ void setup()
     }
 
     // WiFi
-    M5_LOGI("Free heap before WiFi: %u / min: %u", ESP.getFreeHeap(), ESP.getMinFreeHeap());
+    M5_LOGI("Free heap before WiFi: %u / min: %u", (unsigned)esp_get_free_heap_size(),
+            (unsigned)esp_get_minimum_free_heap_size());
     if (!connectWiFi()) {
         M5_LOGE("connectWiFi failed!");
         lcd.fillScreen(TFT_RED);
@@ -946,3 +1055,34 @@ void loop()
         publish_at = now;
     }
 }
+
+#if !defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_timer.h>
+
+#if CONFIG_FREERTOS_UNICORE
+static inline void feedIdleTaskPeriodically(void)
+{
+    constexpr uint32_t FEED_INTERVAL_MS{2000};
+    constexpr TickType_t FEED_SLEEP_TICKS{pdMS_TO_TICKS(5)};
+    static uint32_t s_last_feed_ms{};
+    const uint32_t now_ms{static_cast<uint32_t>(esp_timer_get_time() / 1000)};
+    if (now_ms - s_last_feed_ms >= FEED_INTERVAL_MS) {
+        s_last_feed_ms = now_ms;
+        vTaskDelay(FEED_SLEEP_TICKS);
+    }
+}
+#endif
+
+extern "C" void app_main(void)
+{
+    setup();
+    for (;;) {
+#if CONFIG_FREERTOS_UNICORE
+        feedIdleTaskPeriodically();
+#endif
+        loop();
+    }
+}
+#endif

@@ -1,0 +1,26 @@
+# The "Target unit" choice is shared by the UnitID examples.
+rsource "../../../common/Kconfig.variant"
+
+menu "Blinky-Hello-World settings"
+
+config EXAMPLE_WIFI_SSID
+    string "Wi-Fi SSID"
+    default ""
+    help
+        SSID to connect to. If empty, the station config stored in NVS is used.
+
+config EXAMPLE_WIFI_PASSWORD
+    string "Wi-Fi password"
+    default ""
+
+config EXAMPLE_MQTT_URI
+    string "AWS IoT endpoint"
+    default ""
+    help
+        AWS IoT Core endpoint (xxxxxxxx-ats.iot.<region>.amazonaws.com).
+
+config EXAMPLE_MQTT_PORT
+    int "AWS IoT port"
+    default 8883
+
+endmenu
