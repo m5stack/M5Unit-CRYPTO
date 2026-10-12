@@ -33,7 +33,7 @@ constexpr uint32_t READ_INTERVAL_MS{1000};  // Interval for reading the TRNG
 char serial_number[19]{};  // 18 hex characters + '\0'
 m5::utility::elapsed_time_t last_read_ms{};
 
-//! True when the board has a real screen (Atom / NanoC6 / NanoH2 / NessoN1 have none)
+//! True when the board has a real screen (Atom / NanoC6 / NanoH2 have none)
 bool has_lcd{};
 
 void draw_text(const char* sn, const char* value)
