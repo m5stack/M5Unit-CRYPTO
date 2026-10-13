@@ -40,7 +40,6 @@ The unit's device certificate and serial number appear on the serial monitor.
 13:58:46.310 > -----END CERTIFICATE-----
 13:58:46.313 > *** AWS endpoint is empty ***
 ```
-``
 
 #### Make device certificate file
 Make device_cert.crt at project directory
@@ -88,13 +87,13 @@ Policy exists.
 Thing deleted.
 {
     "thingName": "0123456789ABCDEF01",
-    "thingArn": "arn:aws:iot:us-east-1:467176691427:thing/0123456789ABCDEF01",
-    "thingId": "70c23967-9c9e-4096-81d6-a4204e2374fb"
+    "thingArn": "arn:aws:iot:us-east-1:123456789012:thing/0123456789ABCDEF01",
+    "thingId": "01234567-89ab-cdef-0123-456789abcdef"
 }
 Thing "0123456789ABCDEF01" created.
 [4/6] Checking or registering certificate...
 Looking for matching certificate in current region...
-Found matching certificate: arn:aws:iot:us-east-1:467176691427:cert/7eba90338ba67d4633fbc14e01a37b6050eeae32e1abe00244a6c43b76ff45cd
+Found matching certificate: arn:aws:iot:us-east-1:123456789012:cert/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 Reusing existing certificate.
 [5/6] Attaching certificate to thing...
 [6/6] Attaching policy...
@@ -137,7 +136,7 @@ Edit Blinky-Hello-World.ino
 Edit ini file
 
 ```ini
-[env:UnitID_Blinky-Hello-wWorld_Core2_Arduino_latest]
+[env:UnitID_Blinky-Hello-World_Core_Arduino_latest]
 .
 .
 build_flags = ${option_release.build_flags}
