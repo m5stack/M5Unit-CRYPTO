@@ -128,12 +128,12 @@ jobs:
             board: Core
           # Builtin ATECC608B (Core2 for AWS)
           - example: PlotToSerial
-            unit: BultinATECC608
+            unit: BuiltinATECC608
             board: Core2
             framework: Arduino
             espressif32: latest
           - example: Blinky-Hello-World
-            unit: BultinATECC608
+            unit: BuiltinATECC608
             board: Core2
             framework: Arduino
             espressif32: latest
