@@ -1455,6 +1455,66 @@ TEST_F(TestATECC608B_TNGTLS, CertificateChainVerification)
         << "Slot 11 should contain signer public key";
 }
 
+// The DER signature is 73-75 bytes (or shorter with leading zeros) depending on the MSB of R and S.
+// Check that every length fits the buffer and the certificate length is adjusted (no device access)
+TEST(CertificateSignature, Length)
+{
+    struct Pattern {
+        uint8_t r0, r1;    // First bytes of R
+        uint8_t s0;        // First byte of S
+        uint32_t der_len;  // Expected DER signature length
+    };
+    constexpr Pattern patterns[] = {
+        {0x11, 0x11, 0x22, 73},  // R, S MSB 0
+        {0x91, 0x11, 0x22, 74},  // R MSB 1
+        {0x91, 0x11, 0xA2, 75},  // R, S MSB 1 (largest)
+        {0x00, 0x11, 0x22, 72},  // R with a leading zero byte
+    };
+    struct Template {
+        const uint8_t* data;
+        uint32_t size;
+        uint16_t offset_signature;
+        uint16_t max_size;
+    };
+    const Template templates[] = {
+        {template_for_device, template_for_device_size, 473, MAX_DEVICE_CERTIFICATE_SIZE},
+        {template_for_signer, template_for_signer_size, 446, MAX_SIGNER_CERTIFICATE_SIZE},
+    };
+
+    for (auto&& t : templates) {
+        // The outer SEQUENCE length of the template covers everything after its 4-byte header
+        EXPECT_EQ(t.data[0], 0x30);
+        EXPECT_EQ(t.data[1], 0x82);
+        EXPECT_EQ((t.data[2] << 8) | t.data[3], t.size - 4);
+
+        for (auto&& p : patterns) {
+            SCOPED_TRACE(t.size);
+            SCOPED_TRACE(p.der_len);
+            uint8_t sig[64]{};
+            memset(sig, 0x33, sizeof(sig));
+            sig[0]  = p.r0;
+            sig[1]  = p.r1;
+            sig[32] = p.s0;
+
+            uint8_t cert[600]{};
+            memcpy(cert, t.data, t.size);
+            uint16_t olen = t.max_size;
+            EXPECT_TRUE(insert_certificate_signature(cert, olen, t.size, t.offset_signature, sig));
+            EXPECT_EQ(olen, t.offset_signature + p.der_len);
+            EXPECT_LE(olen, t.max_size);
+            EXPECT_EQ((cert[2] << 8) | cert[3], olen - 4);           // Outer SEQUENCE length
+            EXPECT_EQ(cert[t.offset_signature], 0x03);               // BIT STRING
+            EXPECT_EQ(cert[t.offset_signature + 1], p.der_len - 2);  // BIT STRING length
+            EXPECT_EQ(cert[olen - 1], 0x33);                         // Last byte of S
+
+            // One byte short of the signature
+            memcpy(cert, t.data, t.size);
+            olen = t.offset_signature + p.der_len - 1;
+            EXPECT_FALSE(insert_certificate_signature(cert, olen, t.size, t.offset_signature, sig));
+        }
+    }
+}
+
 TEST_F(TestATECC608B_TNGTLS, ReadWriteGeneralData)
 {
     SCOPED_TRACE(ustr);

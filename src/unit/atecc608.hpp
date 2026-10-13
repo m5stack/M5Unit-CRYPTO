@@ -235,6 +235,30 @@ extern const uint32_t template_for_device_size;
 extern const uint32_t template_for_signer_size;
 ///@endcond
 
+///@name Certificate size
+///@{
+/*!
+  The DER signature at the end of a certificate is 73-75 bytes long (an INTEGER gets a leading 0x00 when its MSB is 1),
+  so a certificate can be longer than its template. Give an output buffer of at least these sizes
+*/
+constexpr uint16_t MAX_DEVICE_CERTIFICATE_SIZE{548};  //!< Device certificate (template 546 + 2)
+constexpr uint16_t MAX_SIGNER_CERTIFICATE_SIZE{521};  //!< Signer certificate (template 520 + 1)
+///@}
+
+///@cond
+/*!
+  @brief Put the DER encoded signature at the end of a certificate built from a template
+  @param[in,out] out Certificate that holds a copy of the template
+  @param[in,out] olen In: buffer length / Out: certificate length
+  @param template_size Size of the template
+  @param offset_signature Offset of the signature (BIT STRING) in the template
+  @param raw_sig Raw signature (R and S, 32 bytes each)
+  @return True if successful
+*/
+bool insert_certificate_signature(uint8_t* out, uint16_t& olen, const uint32_t template_size,
+                                  const uint16_t offset_signature, const uint8_t raw_sig[64]);
+///@endcond
+
 /*!
   @class m5::unit::atecc608::CompCertAccessor
   @brief Compressed certificate accessor
