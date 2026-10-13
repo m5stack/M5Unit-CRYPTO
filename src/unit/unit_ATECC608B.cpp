@@ -513,7 +513,7 @@ bool UnitATECC608B::counter(uint32_t& value, const uint8_t counter, const uint8_
 
     bool ok{};
     if (send_command(OPCODE_COUNTER, mode, counter)) {
-        m5::utility::delay(mode == 0 ? DELAY_READ : DELAY_COUNTER);
+        m5::utility::delay(DELAY_COUNTER);
         uint8_t buf[4]{};
         ok    = receive_response(buf, sizeof(buf));
         value = ok ? m5::types::little_uint32_t(buf[0], buf[1], buf[2], buf[3]).get() : 0;

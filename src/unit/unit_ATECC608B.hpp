@@ -681,7 +681,7 @@ protected:
     bool write_nonce(const atecc608::Destination dest, const uint8_t* input, const uint32_t ilen);
 
     bool read_data(uint8_t* rbuf, const uint32_t rlen, const uint8_t zone, const uint16_t address,
-                   const uint32_t delayMs = 3 /* read default */);
+                   const uint32_t delayMs = atecc608::DELAY_READ);
     bool read_slot_config_word(uint16_t& cfg, const uint8_t baseOffset, const atecc608::Slot slot);
 
     virtual bool ecdh_receive32(uint8_t out[32], const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64]);
