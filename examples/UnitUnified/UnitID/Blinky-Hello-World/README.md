@@ -150,8 +150,8 @@ build_flags = ${option_release.build_flags}
 ```
 
 #### ESP-IDF
-ESP-IDF 5.x (>= 5.1) on a Wi-Fi capable chip (esp32 / esp32s3 / esp32c3 / esp32c5 / esp32c6).  
-ESP-IDF 6.x is not supported yet (it ships mbedtls 4).  
+ESP-IDF 5.x (>= 5.1) or 6.1 and later, on a Wi-Fi capable chip (esp32 / esp32s3 / esp32c3 / esp32c5 / esp32c6).  
+ESP-IDF 6.0 is not supported: its mbedtls 4 has no PSA secure element driver, which signs the TLS handshake with the ATECC608B on 6.1.  
 Set the Wi-Fi and AWS IoT settings in menuconfig.
 
 ```sh

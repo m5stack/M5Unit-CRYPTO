@@ -72,9 +72,9 @@ jobs:
           target: ${{ matrix.target }}
           path: examples/UnitUnified/UnitID/PlotToSerial
 
-  # Blinky-Hello-World adds Wi-Fi and the mbedtls TLS client. mbedtls_pk_info_compat.h branches on the IDF
-  # version (mbedtls 3.x layouts), so the idf axis is built on esp32, and the Wi-Fi capable chips on 5.5.4.
-  # ESP-IDF 6.x is not built: it ships mbedtls 4 (PSA), which the example does not support yet.
+  # Blinky-Hello-World adds Wi-Fi and the mbedtls TLS client. src/device_key.hpp branches on the mbedtls
+  # version (3.x: mbedtls_pk_info_t layouts, 4.x on IDF 6.1: PSA secure element driver), so the idf axis is
+  # built on esp32, and the Wi-Fi capable chips on 5.5.4.
   # The built-in ATECC608B of Core2 for AWS (esp32 only) is selected with the Kconfig variant.
   build-examples:
     name: ${{ matrix.idf }} ${{ matrix.target }} ${{ matrix.example }} ${{ matrix.config != '' && 'Core2AWS' || '' }}
@@ -89,6 +89,7 @@ jobs:
           - {example: Blinky-Hello-World, target: esp32s3, idf: v5.5.4, config: ''}
           - {example: Blinky-Hello-World, target: esp32c6, idf: v5.5.4, config: ''}
           - {example: Blinky-Hello-World, target: esp32, idf: v5.1.7, config: ''}
+          - {example: Blinky-Hello-World, target: esp32, idf: v6.1, config: ''}  # mbedtls 4 (PSA)
           - {example: PlotToSerial, target: esp32, idf: v5.5.4, config: 'CONFIG_EXAMPLE_USING_M5CORE2_AWS_BUILTIN=y'}
           - {example: PlotToSerial, target: esp32, idf: v5.1.7, config: 'CONFIG_EXAMPLE_USING_M5CORE2_AWS_BUILTIN=y'}  # legacy driver
           - {example: PlotToSerial, target: esp32, idf: v6.1, config: 'CONFIG_EXAMPLE_USING_M5CORE2_AWS_BUILTIN=y'}

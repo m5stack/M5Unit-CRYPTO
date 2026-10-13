@@ -24,11 +24,6 @@
 #include <freertos/event_groups.h>
 #include <nvs_flash.h>
 #include <esp_idf_version.h>
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
-// ESP-IDF 6 ships mbedtls 4 (PSA crypto): ctr_drbg / entropy are gone and mbedtls_pk_info_t, used to sign
-// with the ATECC608B, is no longer customizable
-#error "This example supports ESP-IDF 5.x (ESP-IDF 6 ships mbedtls 4, which this example does not support yet)"
-#endif
 #if !CONFIG_SOC_WIFI_SUPPORTED
 #error "This example needs a Wi-Fi capable target (esp32 / esp32s3 / esp32c3 / esp32c5 / esp32c6)"
 #endif
@@ -36,12 +31,11 @@
 
 #include <mbedtls/ssl.h>
 #include <mbedtls/net_sockets.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/debug.h>
 
-#include "../src/mbedtls_pk_info_compat.h"
+// The TLS device key in the ATECC608B (the only part that depends on the mbedtls version)
+#include "../src/device_key.hpp"
 
 using namespace m5::unit::atecc608;
 
@@ -148,13 +142,19 @@ mbedtls_x509_crt clicert{};  // Client device cert
 mbedtls_pk_context pkey{};   //
 mbedtls_ssl_config conf{};
 mbedtls_ssl_context ssl{};
-mbedtls_ctr_drbg_context ctr_drbg{};
-mbedtls_entropy_context entropy{};
 mbedtls_net_context server_fd{};
-mbedtls_pk_info_t my_pk_info{};
 
 char mqtt_topic[128]{};  // Top level topic and thing name
 bool waiting_pingresp{};
+
+// Time to wait for the server (TLS handshake, CONNACK, SUBACK). A tethered or cellular link can take several seconds
+constexpr uint32_t SERVER_RESPONSE_TIMEOUT_MS{15000};
+// Read timeout after the handshake. Must be shorter than the MQTT keep alive (10 s) so that the loop sends PINGREQ
+// in time (the server closes the connection after 1.5 x keep alive without packets)
+constexpr uint32_t MQTT_READ_TIMEOUT_MS{5000};
+// Connection attempts (TLS + MQTT) before giving up
+constexpr uint32_t CONNECT_ATTEMPTS{3};
+constexpr uint32_t CONNECT_RETRY_INTERVAL_MS{3000};
 
 uint16_t get_next_packet_id()
 {
@@ -198,7 +198,8 @@ void dump_cert(const mbedtls_x509_crt *cert, const bool raw = false)
         M5_LOGI("SAN Tag:%d Len:%zu", san->buf.tag, san->buf.len);
     }
 
-    char buf[2048]{};
+    // Called from the TLS handshake (verify_cert), deep in the mbedtls call stack: keep the buffer off the stack
+    static char buf[2048]{};
     int ret = mbedtls_x509_crt_info(buf, sizeof(buf) - 1, "", cert);
     if (ret > 0) {
         buf[ret] = '\0';
@@ -242,92 +243,9 @@ void print_provisioning(m5::unit::UnitID &u)
     printPEM(cert, clen);
 }
 
-// If out is nullptr, only size calculation is performed
-uint32_t encode_der_integer(uint8_t *out, const uint8_t *input, uint32_t input_size)
-{
-    // Skip leading zero
-    uint32_t leading_zeros = 0;
-    while (leading_zeros < input_size && input[leading_zeros] == 0x00) {
-        leading_zeros++;
-    }
-
-    // Padding if MSB 1
-    bool needs_leading_zero = false;
-    if (leading_zeros < input_size && (input[leading_zeros] & 0x80)) {
-        needs_leading_zero = true;
-    }
-
-    // Size
-    uint32_t value_size = input_size - leading_zeros;
-    uint32_t total_size = 1 + 1 + (needs_leading_zero ? 1 : 0) + value_size;  // Tag + Length + [0x00] + value
-
-    if (out) {
-        uint32_t offset = 0;
-        out[offset++]   = 0x02;  // INTEGER tag
-        // Length
-        out[offset++] = static_cast<uint8_t>((needs_leading_zero ? 1 : 0) + value_size);
-        // Optional leading zero for positive integer
-        if (needs_leading_zero) {
-            out[offset++] = 0x00;
-        }
-        // Value
-        memcpy(out + offset, input + leading_zeros, value_size);
-    }
-    return total_size;
-}
-
-int custom_sign_callback(custom_sign_ctx_t ctx, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
-                         unsigned char *sig,
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-                         size_t sig_size,
-#endif
-                         size_t *sig_len, int (*f_rng)(void *, unsigned char *, size_t), void *p_rng)
-{
-    (void)ctx;
-    (void)md_alg;
-    (void)(f_rng);
-    (void)(p_rng);
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    (void)sig_size;
-#endif
-
-    // Sign
-    if (hash_len != 32 || !unit.writeNonce32(Destination::MsgDigestBuffer, hash)) {
-        M5_LOGE("NONCE NG:%u", hash_len);
-        return MBEDTLS_ERR_PK_FILE_IO_ERROR;
-    }
-    uint8_t raw_sig[64]{};
-    if (!unit.signExternal(raw_sig, Slot::PrimaryPrivateKey, Source::MsgDigestBuffer)) {
-        M5_LOGE("SIGN NG:%u", hash_len);
-        return MBEDTLS_ERR_PK_FILE_IO_ERROR;
-    }
-
-    // Write DER ASN1
-    const uint8_t *R = raw_sig;
-    const uint8_t *S = raw_sig + 32;
-
-    uint8_t encoded_r[64]{};  // tag + length + optional 0x00 + value
-    uint8_t encoded_s[64]{};
-    uint32_t len_r = encode_der_integer(nullptr, R, 32);
-    uint32_t len_s = encode_der_integer(nullptr, S, 32);
-    if (len_r == 0 || len_s == 0 || len_r > sizeof(encoded_r) || len_s > sizeof(encoded_s)) {
-        M5_LOGE("Invalid encoded size R:%u S:%u", len_r, len_s);
-        return MBEDTLS_ERR_PK_BAD_INPUT_DATA;
-    }
-    encode_der_integer(encoded_r, R, 32);
-    encode_der_integer(encoded_s, S, 32);
-
-    uint8_t *p = sig;
-    *p++       = 0x30;                                 // SEQUENCE tag
-    *p++       = static_cast<uint8_t>(len_r + len_s);  // total length
-    memcpy(p, encoded_r, len_r);
-    p += len_r;
-    memcpy(p, encoded_s, len_s);
-    p += len_s;
-    *sig_len = static_cast<size_t>(p - sig);
-
-    return 0;  // OK
-}
+// Both versions keep reconnecting until connected. After a reset without disconnecting, an access point with
+// PMF (WPA3) still holds the old association and refuses the first attempts for a while (comeback time)
+constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS{20000};
 
 #if defined(ARDUINO)
 bool connectWiFi()
@@ -354,8 +272,8 @@ bool connectWiFi()
         M5_LOGI("Use inner credential");
         WiFi.begin();
     }
-    uint32_t retry{10};
-    while (retry--) {
+    const auto start_at = m5::utility::millis();
+    while (m5::utility::millis() - start_at < WIFI_CONNECT_TIMEOUT_MS) {
         m5::utility::delay(500);
         if (WiFi.status() == WL_CONNECTED) {
             return true;
@@ -367,7 +285,6 @@ bool connectWiFi()
 #else
 EventGroupHandle_t wifi_events{};
 constexpr EventBits_t WIFI_CONNECTED_BIT{BIT0};
-constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS{5000};  // Same as the Arduino version (10 x 500 ms)
 
 void on_wifi_event(void *, esp_event_base_t base, int32_t id, void *)
 {
@@ -436,56 +353,10 @@ bool connectWiFi()
 }
 #endif
 
-bool init_pk(mbedtls_pk_context *pkey)
-{
-    int ret = 0;
-    uint8_t public_key[64]{};
-    mbedtls_ecp_keypair *ecp = nullptr;
-
-    if (!pkey) {
-        return false;
-    }
-
-    mbedtls_pk_init(pkey);
-
-    // sign_func to our process
-    //    my_pk_info           = *(mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-    const mbedtls_pk_info_t *orig_info = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
-    memcpy(&my_pk_info, orig_info, sizeof(*orig_info));
-    my_pk_info.sign_func = custom_sign_callback;
-    if (mbedtls_pk_setup(pkey, &my_pk_info)) {
-        return false;
-    }
-
-    // Public key
-    if (!unit.generatePublicKey(public_key, Slot::PrimaryPrivateKey)) {
-        return false;
-    }
-
-    // EC
-    ecp = mbedtls_pk_ec(*pkey);
-    if (mbedtls_ecp_group_load(&ecp->MBEDTLS_PRIVATE(grp), MBEDTLS_ECP_DP_SECP256R1)) {
-        return false;
-    }
-
-    ret = mbedtls_mpi_read_binary(&ecp->MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(X), public_key, 32);
-    if (ret != 0) {
-        return false;
-    }
-    ret = mbedtls_mpi_read_binary(&ecp->MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Y), public_key + 32, 32);
-    if (ret != 0) {
-        return false;
-    }
-    if ((ret = mbedtls_mpi_lset(&ecp->MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Z), 1)) != 0) {
-        return false;
-    }
-
-    return true;
-}
-
 int verify_cert(void *data, mbedtls_x509_crt *crt, int depth, uint32_t *flags)
 {
-    char buf[1024]{};
+    // Called from the TLS handshake, deep in the mbedtls call stack: keep the buffer off the stack
+    static char buf[1024]{};
     ((void)data);
 
     M5_LOGI("Verify requested for (Depth %d):", depth);
@@ -508,18 +379,9 @@ bool connectTLS()
     mbedtls_net_init(&server_fd);
     mbedtls_ssl_init(&ssl);
     mbedtls_ssl_config_init(&conf);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_x509_crt_init(&cacert);
     mbedtls_x509_crt_init(&clicert);
     mbedtls_pk_init(&pkey);
-
-    // Seeding the random number generator
-    mbedtls_entropy_init(&entropy);
-    if ((ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *)"M5Unit-ID",
-                                     10)) != 0) {
-        M5_LOGE("failed! mbedtls_ctr_drbg_seed returned -0x%x", -ret);
-        return false;
-    }
 
     //  Load root CA
     if ((ret = mbedtls_x509_crt_parse_der(&cacert, root_ca_der, sizeof(root_ca_der))) != 0) {
@@ -539,9 +401,9 @@ bool connectTLS()
         return false;
     }
 
-    // Pkey
-    if (!init_pk(&pkey)) {
-        M5_LOGE("failed! init_pk");
+    // Device key (the private key stays in the ATECC608B)
+    if (!device_key::begin(unit, &pkey)) {
+        M5_LOGE("failed! device_key::begin");
         return false;
     }
 
@@ -579,7 +441,7 @@ bool connectTLS()
 
     mbedtls_ssl_conf_verify(&conf, verify_cert, nullptr);
     mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_REQUIRED);
-    mbedtls_ssl_conf_rng(&conf, mbedtls_ctr_drbg_random, &ctr_drbg);
+    device_key::configure(&conf);
 
     mbedtls_ssl_conf_ca_chain(&conf, &cacert, nullptr);
 
@@ -587,7 +449,7 @@ bool connectTLS()
         M5_LOGE("failed! mbedtls_ssl_conf_own_cert returned %d", ret);
         return false;
     }
-    mbedtls_ssl_conf_read_timeout(&conf, 5000);
+    mbedtls_ssl_conf_read_timeout(&conf, SERVER_RESPONSE_TIMEOUT_MS);
 
     if ((ret = mbedtls_ssl_setup(&ssl, &conf)) != 0) {
         M5_LOGE("failed! mbedtls_ssl_setup returned -0x%x", -ret);
@@ -612,6 +474,7 @@ bool connectTLS()
 
     M5_LOGI("Handshake Protocol:%s Ciphersuite:%s Record expansion:", mbedtls_ssl_get_version(&ssl),
             mbedtls_ssl_get_ciphersuite(&ssl));
+    mbedtls_ssl_conf_read_timeout(&conf, MQTT_READ_TIMEOUT_MS);
     if ((ret = mbedtls_ssl_get_record_expansion(&ssl)) >= 0) {
         M5_LOGI("Record expansion:%d", ret);
     } else {
@@ -650,11 +513,9 @@ void cleanupTLS()
 
     mbedtls_x509_crt_free(&clicert);
     mbedtls_x509_crt_free(&cacert);
-    mbedtls_pk_free(&pkey);
+    device_key::end(&pkey);
     mbedtls_ssl_free(&ssl);
     mbedtls_ssl_config_free(&conf);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
 }
 
 void mqtt_payload_handler(const char *topic, const char *payload, uint32_t plen)
@@ -938,7 +799,7 @@ bool connectMQTT(const char *client_id)
     }
 
     // Wait receive CONNACK
-    return mqtt_wait_for(2 /* CONNACK */, 2000);
+    return mqtt_wait_for(2 /* CONNACK */, SERVER_RESPONSE_TIMEOUT_MS);
 }
 
 bool subscribeMQTT(const char *topic)
@@ -969,7 +830,7 @@ bool subscribeMQTT(const char *topic)
     }
 
     // Wait receive SUBACK
-    return mqtt_wait_for(9 /* SUBACK */, 2000);
+    return mqtt_wait_for(9 /* SUBACK */, SERVER_RESPONSE_TIMEOUT_MS);
 }
 
 bool yieldMQTT(uint32_t timeout_ms)
@@ -1017,6 +878,26 @@ bool yieldMQTT(uint32_t timeout_ms)
 }
 
 }  // namespace
+
+// TLS, MQTT CONNECT and SUBSCRIBE
+bool connectAWS(const char *client_id, const char *subscribe_topic)
+{
+    waiting_pingresp = false;
+    if (!connectTLS()) {
+        M5_LOGE("connectTLS failed!");
+        return false;
+    }
+    M5_LOGI("TLS Connected");
+    if (!connectMQTT(client_id)) {
+        M5_LOGE("MQTT CONNECT failed!");
+        return false;
+    }
+    if (!subscribeMQTT(subscribe_topic)) {
+        M5_LOGE("MQTT SUBSCRIBE failed!");
+        return false;
+    }
+    return true;
+}
 
 void setup()
 {
@@ -1074,25 +955,21 @@ void setup()
 
     snprintf(mqtt_port_str, sizeof(mqtt_port_str), "%u", mqtt_port);
 
-    // TLS
-    if (!connectTLS()) {
-        M5_LOGE("connectTLS failed!");
-        m5::unit::wiring::failStop();
-    }
-    M5_LOGI("TLS Connected");
-
-    // MQTT
+    // TLS and MQTT
     char subscribe_topic[256]{};
     snprintf(subscribe_topic, sizeof(subscribe_topic), "%s/#", mqtt_topic);
 
-    if (!connectMQTT(mqtt_topic)) {
-        M5_LOGE("MQTT CONNECT failed!");
-        m5::unit::wiring::failStop();
-    }
-
-    if (!subscribeMQTT(subscribe_topic)) {
-        M5_LOGE("MQTT SUBSCRIBE failed!");
-        m5::unit::wiring::failStop();
+    uint32_t attempt{1};
+    while (!connectAWS(mqtt_topic, subscribe_topic)) {
+        cleanupTLS();
+        if (attempt >= CONNECT_ATTEMPTS) {
+            M5_LOGE("Failed to connect to AWS IoT");
+            m5::unit::wiring::failStop();
+        }
+        M5_LOGW("Retry connecting to AWS IoT (%u/%u)", static_cast<unsigned>(attempt + 1),
+                static_cast<unsigned>(CONNECT_ATTEMPTS));
+        m5::utility::delay(CONNECT_RETRY_INTERVAL_MS);
+        ++attempt;
     }
 
     M5.Log.printf(

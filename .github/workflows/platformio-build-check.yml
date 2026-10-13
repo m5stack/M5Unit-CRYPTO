@@ -133,6 +133,26 @@ jobs:
             espressif32: latest
             unit: UnitID
             board: Core
+          - example: Blinky-Hello-World
+            framework: Arduino
+            espressif32: latest
+            unit: UnitID
+            board: CoreS3
+          - example: Blinky-Hello-World
+            framework: Arduino
+            espressif32: latest
+            unit: UnitID
+            board: NanoC6
+          - example: Blinky-Hello-World
+            framework: Arduino
+            espressif32: latest
+            unit: UnitID
+            board: Tab5
+#          - example: Blinky-Hello-World  # NessoN1 (ESP32-C6): represented by NanoC6
+#            framework: Arduino
+#            espressif32: latest
+#            unit: UnitID
+#            board: NessoN1
           # Builtin ATECC608B (Core2 for AWS)
           - example: PlotToSerial
             unit: BuiltinATECC608
