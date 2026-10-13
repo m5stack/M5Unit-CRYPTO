@@ -110,11 +110,13 @@ bool UnitATECC608B::begin()
         return false;
     }
 
-    // End the session
-    if (!_cfg.idle) {
-        return sleep();
+    // End the session (the result does not affect begin)
+    if (_cfg.idle) {
+        idle();
+    } else {
+        sleep();
     }
-    return idle();
+    return true;
 }
 
 bool UnitATECC608B::begin_impl()
@@ -170,8 +172,9 @@ bool UnitATECC608B::wakeup()
         }
         M5_LIB_LOGW("Wakeup retry %u err:%d resp:%02X,%02X,%02X,%02X", retry, (int)err, response[0], response[1],
                     response[2], response[3]);
-        // Device may be awake with stale state — force sleep before retry
-        writeWithTransaction(&WORD_ADDRESS_VALUE_SLEEP, 1);
+        // Device may be awake with stale state — reset the I/O buffer before retry.
+        // Idle (not sleep) keeps TempKey and the SHA context that a previous command left for the next one
+        writeWithTransaction(&WORD_ADDRESS_VALUE_IDLE, 1);
         m5::utility::delay(2);
     }
     return ok;
@@ -179,14 +182,16 @@ bool UnitATECC608B::wakeup()
 
 bool UnitATECC608B::sleep()
 {
-    writeWithTransaction(&WORD_ADDRESS_VALUE_SLEEP, 1);
-    return delay_true();
+    const bool ok = (writeWithTransaction(&WORD_ADDRESS_VALUE_SLEEP, 1) == m5::hal::error::error_t::OK);
+    m5::utility::delay(1);
+    return ok;
 }
 
 bool UnitATECC608B::idle()
 {
-    writeWithTransaction(&WORD_ADDRESS_VALUE_IDLE, 1);
-    return delay_true();
+    const bool ok = (writeWithTransaction(&WORD_ADDRESS_VALUE_IDLE, 1) == m5::hal::error::error_t::OK);
+    m5::utility::delay(1);
+    return ok;
 }
 
 bool UnitATECC608B::readRevision(uint8_t data[4])
@@ -204,7 +209,8 @@ bool UnitATECC608B::readRevision(uint8_t data[4])
         m5::utility::delay(DELAY_INFO);
         ok = receive_response(data, 4);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readKeyValid(bool& valid, const atecc608::Slot slot)
@@ -221,7 +227,8 @@ bool UnitATECC608B::readKeyValid(bool& valid, const atecc608::Slot slot)
         ok    = receive_response(rbuf, sizeof(rbuf));
         valid = ok && (rbuf[0] & 1);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readDeviceState(uint16_t& state)
@@ -238,7 +245,8 @@ bool UnitATECC608B::readDeviceState(uint16_t& state)
         ok    = receive_response(rbuf, sizeof(rbuf));
         state = (rbuf[0] << 8) | (rbuf[1] << 0);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readRandomArray(uint8_t data[32], const bool updateSeed)
@@ -256,7 +264,8 @@ bool UnitATECC608B::readRandomArray(uint8_t data[32], const bool updateSeed)
         m5::utility::delay(DELAY_RANDOM);
         ok = receive_response(data, 32);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readSerialNumber(uint8_t sn[9])
@@ -279,7 +288,8 @@ bool UnitATECC608B::readSerialNumber(uint8_t sn[9])
         sn[8] = tmp[0];
     }
 
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readSerialNumber(char str[19])
@@ -306,7 +316,8 @@ bool UnitATECC608B::readZoneLocked(bool& configLocked, bool& dataLocked)
         configLocked = (rbuf[3] == 0x00);  // 87 LockConfig (Config zone)
         dataLocked   = (rbuf[2] == 0x00);  // 86 LockValue (Data zone)
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readSlotLocked(uint16_t& slotLockedBits)
@@ -321,7 +332,8 @@ bool UnitATECC608B::readSlotLocked(uint16_t& slotLockedBits)
     if (ok) {
         slotLockedBits = m5::types::little_uint16_t(rbuf[0], rbuf[1]).get() ^ 0xFFFF;
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readConfigZone(uint8_t config[128])
@@ -341,7 +353,8 @@ bool UnitATECC608B::readConfigZone(uint8_t config[128])
             break;
         }
     }
-    return idle() && (offset == 128);
+    idle();
+    return offset == 128;
 }
 
 bool UnitATECC608B::readDataZone(uint8_t* data, const uint16_t len, const atecc608::Slot slot)
@@ -376,7 +389,8 @@ bool UnitATECC608B::readDataZone(uint8_t* data, const uint16_t len, const atecc6
         remaining -= copied;
     }
 
-    return idle() && (remaining == 0);
+    idle();
+    return remaining == 0;
 }
 
 bool UnitATECC608B::writeGeneralData(const uint8_t* data, const uint16_t len, const uint16_t offset)
@@ -433,7 +447,8 @@ bool UnitATECC608B::writeGeneralData(const uint8_t* data, const uint16_t len, co
         written += BLOCK_SIZE;
     }
 
-    return idle();
+    idle();
+    return true;
 }
 
 bool UnitATECC608B::readGeneralData(uint8_t* data, const uint16_t len, const uint16_t offset)
@@ -480,7 +495,8 @@ bool UnitATECC608B::readGeneralData(uint8_t* data, const uint16_t len, const uin
         read_sz += BLOCK_SIZE;
     }
 
-    return idle() && (read_sz == rlen);
+    idle();
+    return read_sz == rlen;
 }
 
 bool UnitATECC608B::readOTPZone(uint8_t otp[64])
@@ -500,7 +516,8 @@ bool UnitATECC608B::readOTPZone(uint8_t otp[64])
             break;
         }
     }
-    return idle() && (offset == 64);
+    idle();
+    return offset == 64;
 }
 
 bool UnitATECC608B::counter(uint32_t& value, const uint8_t counter, const uint8_t mode)
@@ -518,7 +535,8 @@ bool UnitATECC608B::counter(uint32_t& value, const uint8_t counter, const uint8_
         ok    = receive_response(buf, sizeof(buf));
         value = ok ? m5::types::little_uint32_t(buf[0], buf[1], buf[2], buf[3]).get() : 0;
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::selfTest(uint8_t& resultBits, const uint8_t testBits)
@@ -533,7 +551,8 @@ bool UnitATECC608B::selfTest(uint8_t& resultBits, const uint8_t testBits)
         m5::utility::delay(DELAY_SELFTEST);
         ok = receive_response(&resultBits, 1);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::createNonce(uint8_t output[32], const uint8_t input[20], const bool useRNG, const bool updateSeed)
@@ -555,7 +574,8 @@ bool UnitATECC608B::createNonce(uint8_t output[32], const uint8_t input[20], con
         m5::utility::delay(DELAY_NONCE);
         ok = receive_response(output ? output : buf, 32);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::write_nonce(const Destination dest, const uint8_t* input, const uint32_t ilen)
@@ -576,7 +596,8 @@ bool UnitATECC608B::write_nonce(const Destination dest, const uint8_t* input, co
         //     M5_LIB_LOGE("Error:%02X", result[0]);
         // }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::generateKey(uint8_t pubKey[64])
@@ -604,7 +625,8 @@ bool UnitATECC608B::generate_key(uint8_t pubKey[64], const uint8_t mode, const u
             ok = receive_response(&status, 1) && (status == 0);
         }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::sign(uint8_t signature[64], const uint8_t mode, const uint16_t param2, const atecc608::Source src)
@@ -621,7 +643,8 @@ bool UnitATECC608B::sign(uint8_t signature[64], const uint8_t mode, const uint16
         m5::utility::delay(DELAY_SIGN);
         ok = receive_response(signature, 64);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::startSHA256()
@@ -633,7 +656,8 @@ bool UnitATECC608B::startSHA256()
             m5::utility::delay(DELAY_SHA);
             ok = receive_response(&status, 1);
         }
-        return idle() && ok && status == 0;
+        idle();
+        return ok && status == 0;
     }
     return false;
 }
@@ -682,7 +706,8 @@ bool UnitATECC608B::updateSHA256(const uint8_t* msg, const uint32_t mlen)
             idle_wakeup_at = m5::utility::millis();
         }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::finalizeSHA256(const atecc608::Destination dest, uint8_t digest[32])
@@ -699,7 +724,8 @@ bool UnitATECC608B::finalizeSHA256(const atecc608::Destination dest, uint8_t dig
         m5::utility::delay(DELAY_SHA);
         ok = receive_response(digest, 32);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::ecdh_receive32(uint8_t out[32], const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64])
@@ -714,7 +740,8 @@ bool UnitATECC608B::ecdh_receive32(uint8_t out[32], const uint8_t mode, const ui
         m5::utility::delay(DELAY_ECDH);
         ok = receive_response(out, 32);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t mode, const uint16_t param2,
@@ -736,7 +763,8 @@ bool UnitATECC608B::ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const u
             memcpy(nonce, buf + 32, 32);
         }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::ecdh_no_output(const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64])
@@ -750,7 +778,8 @@ bool UnitATECC608B::ecdh_no_output(const uint8_t mode, const uint16_t param2, co
         uint8_t status{};
         ok = receive_response(&status, 1) && (status == 0);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::verify(uint8_t mac[32], const uint8_t mode, const uint16_t param2, const uint8_t signature[64],
@@ -792,7 +821,8 @@ bool UnitATECC608B::verify(uint8_t mac[32], const uint8_t mode, const uint16_t p
             }
         }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 //
@@ -895,7 +925,8 @@ bool UnitATECC608B::read_slot_config_word(uint16_t& cfg, const uint8_t baseOffse
     if (ok) {
         cfg = m5::types::little_uint16_t(v[idx], v[idx + 1]).get();
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 }  // namespace unit
