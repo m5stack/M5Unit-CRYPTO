@@ -51,6 +51,8 @@ tmp/
 *.pem
 *.key
 *.cert
+*.crt
+*.der
 
 # ESP-IDF build artifacts
 build/
@@ -61,3 +63,6 @@ dependencies.lock
 
 # clangd LSP (personal, environment dependent)
 .clangd
+
+# clangd index cache
+.cache/

@@ -42,7 +42,7 @@ The unit's device certificate and serial number appear on the serial monitor.
 ```
 
 #### Make device certificate file
-Make device_cert.crt at project directory
+Make device_cert.crt in this example directory
 
 ```pem
 -----BEGIN CERTIFICATE-----
@@ -62,10 +62,11 @@ aXxnZYgX4Jm7UJRL2irQBDO5fQ==
 ```
 
 #### Run AWS IoT setting script
+Run the script in [scripts](scripts) from this example directory
 
 ```bash
 # Usage
-aws_register_thing.sh device_certificate serialnumber region
+./scripts/aws_register_thing.sh device_certificate serialnumber region
 ```
 
 |Argument|Description|
