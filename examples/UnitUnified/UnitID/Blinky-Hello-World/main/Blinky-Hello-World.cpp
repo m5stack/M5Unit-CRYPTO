@@ -52,8 +52,8 @@ namespace {
 // ****************************************************************************************************
 // Fill in the following define or specify with build option
 // ****************************************************************************************************
-// Enable this define when using M5Core2AWS's built-in chip
 #if !defined(USING_M5CORE2_AWS_BUILTIN)
+// For Core2 for AWS built-in ATECC608B (K010-AWS)
 // #define USING_M5CORE2_AWS_BUILTIN
 #endif
 
@@ -610,7 +610,7 @@ bool connectTLS()
         }
     }
 
-    M5_LOGI("Handshake Protocol:%s Ciphersuite:%s Record expeansion:", mbedtls_ssl_get_version(&ssl),
+    M5_LOGI("Handshake Protocol:%s Ciphersuite:%s Record expansion:", mbedtls_ssl_get_version(&ssl),
             mbedtls_ssl_get_ciphersuite(&ssl));
     if ((ret = mbedtls_ssl_get_record_expansion(&ssl)) >= 0) {
         M5_LOGI("Record expansion:%d", ret);
@@ -739,7 +739,7 @@ bool mqtt_cycle_read(uint8_t &out_type)
 // Waiting for receipt of specified packet type
 bool mqtt_wait_for(uint8_t expected_type, uint32_t timeout_ms)
 {
-    auto timeout_at = m5::utility::millis() + timeout_ms;
+    const auto start_at = m5::utility::millis();
     do {
         uint8_t packet_type{};
         if (!mqtt_cycle_read(packet_type)) {
@@ -748,7 +748,7 @@ bool mqtt_wait_for(uint8_t expected_type, uint32_t timeout_ms)
         if (packet_type == expected_type) {
             return true;
         }
-    } while (m5::utility::millis() <= timeout_at);
+    } while (m5::utility::elapsedSince(start_at) <= timeout_ms);
     M5_LOGE("wait_for: timeout waiting for type=%d", expected_type);
     return false;
 }
@@ -893,10 +893,9 @@ bool subscribeMQTT(const char *topic)
 
 bool yieldMQTT(uint32_t timeout_ms)
 {
-    auto start      = m5::utility::millis();
-    auto timeout_at = start + timeout_ms;
+    const auto start = m5::utility::millis();
 
-    static decltype(start) pingresp_timeout_at{}, ping_at{};
+    static m5::utility::elapsed_time_t ping_at{};
 
     constexpr uint32_t keepAliveMs = 10000;
 
@@ -910,7 +909,7 @@ bool yieldMQTT(uint32_t timeout_ms)
         }
 
         // Check PINGRESP timeout
-        if (waiting_pingresp && now > pingresp_timeout_at) {
+        if (waiting_pingresp && m5::utility::elapsedSince(ping_at, now) > keepAliveMs) {
             M5_LOGE("PINGRESP timeout");
             waiting_pingresp = false;
             return false;
@@ -922,9 +921,8 @@ bool yieldMQTT(uint32_t timeout_ms)
             int ret           = mbedtls_ssl_write(&ssl, pingreq, sizeof(pingreq));
             if (ret > 0) {
                 M5_LOGD("PINGREQ sent");
-                ping_at             = now;
-                waiting_pingresp    = true;
-                pingresp_timeout_at = now + keepAliveMs;
+                ping_at          = now;
+                waiting_pingresp = true;
             } else {
                 M5_LOGE("PINGREQ write failed: -0x%X", -ret);
                 return false;
@@ -932,7 +930,7 @@ bool yieldMQTT(uint32_t timeout_ms)
         }
 
         m5::utility::delay(1);
-    } while (m5::utility::millis() <= timeout_at);
+    } while (m5::utility::elapsedSince(start) <= timeout_ms);
 
     return true;
 }
@@ -951,7 +949,7 @@ void setup()
     lcd.fillScreen(TFT_DARKGRAY);
 
 #if defined(USING_M5CORE2_AWS_BUILTIN)
-#pragma message "Using builtin ATECC608BTNGTLS"
+#pragma message("Using builtin ATECC608BTNGTLS")
     // Core2 AWS: the built-in ATECC608B is on the internal bus (M5.In_I2C)
     if (M5.getBoard() != m5::board_t::board_M5StackCore2) {
         M5_LOGE("Only Core2AWS");
@@ -972,10 +970,10 @@ void setup()
     M5_LOGI("ESP-IDF Version %d.%d.%d", (ESP_IDF_VERSION >> 16) & 0xFF, (ESP_IDF_VERSION >> 8) & 0xFF,
             ESP_IDF_VERSION & 0xFF);
 
-    // Read sn string form unit
+    // Read sn string from unit
     if (!unit.readSerialNumber(mqtt_topic)) {
         M5_LOGE("readSerialNumber failed");
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
     // Display information for provisioning
     if (!mqtt_uri || !mqtt_uri[0]) {
@@ -989,8 +987,7 @@ void setup()
             (unsigned)esp_get_minimum_free_heap_size());
     if (!connectWiFi()) {
         M5_LOGE("connectWiFi failed!");
-        lcd.fillScreen(TFT_RED);
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
     M5.Log.printf("WiFi connected!\n");
 
@@ -999,8 +996,7 @@ void setup()
     // TLS
     if (!connectTLS()) {
         M5_LOGE("connectTLS failed!");
-        lcd.fillScreen(TFT_RED);
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
     M5_LOGI("TLS Connected");
 
@@ -1010,12 +1006,12 @@ void setup()
 
     if (!connectMQTT(mqtt_topic)) {
         M5_LOGE("MQTT CONNECT failed!");
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
 
     if (!subscribeMQTT(subscribe_topic)) {
         M5_LOGE("MQTT SUBSCRIBE failed!");
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
 
     M5.Log.printf(
@@ -1032,8 +1028,6 @@ void loop()
 {
     M5.update();
 
-    M5.update();
-
     if (!yieldMQTT(100)) {
         cleanupTLS();
         M5_LOGE("err");
@@ -1045,7 +1039,7 @@ void loop()
     auto now = m5::utility::millis();
     static decltype(now) publish_at{};
 
-    if (now > publish_at + 3000) {
+    if (m5::utility::elapsedSince(publish_at, now) > 3000) {
         if (publishMQTTMessage(mqtt_topic, "hello", "Hello from M5 QOS0")) {
             M5.Log.printf("publish(QOS0)\n");
         }
