@@ -13,11 +13,11 @@
 #include <wiring/m5_unit_unified_wiring.hpp>  // Board-aware connection helpers (include last)
 
 #include <esp_system.h>
+#include <algorithm>
+#include <cstring>
 #if defined(ARDUINO)
 #include <WiFi.h>
 #else
-#include <algorithm>
-#include <cstring>
 #include <esp_event.h>
 #include <esp_netif.h>
 #include <esp_wifi.h>
@@ -684,14 +684,66 @@ void mqtt_payload_handler(const char *topic, const char *payload, uint32_t plen)
     }
 }
 
+// MQTT Remaining Length is a variable length integer (1-4 bytes)
+uint32_t encode_remaining_length(uint8_t *out, uint32_t len)
+{
+    uint32_t n{};
+    do {
+        uint8_t b = len % 128;
+        len /= 128;
+        out[n++] = b | (len ? 0x80 : 0x00);
+    } while (len && n < 4);
+    return n;
+}
+
+// Send a packet: fixed header byte, Remaining Length and body
+bool send_mqtt_packet(const uint8_t header, const uint8_t *body, const uint32_t body_len)
+{
+    uint8_t pkt[1 + 4 + 256]{};
+    if (body_len > 256) {
+        M5_LOGE("MQTT packet too long %u", body_len);
+        return false;
+    }
+    uint32_t pos = 0;
+    pkt[pos++]   = header;
+    pos += encode_remaining_length(pkt + pos, body_len);
+    memcpy(pkt + pos, body, body_len);
+    pos += body_len;
+
+    int ret = mbedtls_ssl_write(&ssl, pkt, pos);
+    if (ret <= 0) {
+        M5_LOGE("mbedtls_ssl_write failed: -0x%x", -ret);
+        return false;
+    }
+    return true;
+}
+
+// Read exactly len bytes (a packet may arrive in pieces)
+bool ssl_read_exact(uint8_t *buf, const uint32_t len)
+{
+    uint32_t got{};
+    while (got < len) {
+        int ret = mbedtls_ssl_read(&ssl, buf + got, len - got);
+        if (ret == MBEDTLS_ERR_SSL_WANT_READ) {
+            continue;
+        }
+        if (ret <= 0) {
+            M5_LOGE("mbedtls_ssl_read error: -0x%X", -ret);
+            return false;
+        }
+        got += ret;
+    }
+    return true;
+}
+
 // Read packet
 bool mqtt_cycle_read(uint8_t &out_type)
 {
     out_type = 0;
 
-    uint8_t buf[128]{};
-    int ret = mbedtls_ssl_read(&ssl, buf, sizeof(buf));
-
+    // Fixed header: packet type
+    uint8_t header{};
+    int ret = mbedtls_ssl_read(&ssl, &header, 1);
     if (ret <= 0) {
         if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_TIMEOUT) {
             // M5_LOGD("MBEDTLS_ERR_SSL_WANT_READ / MBEDTLS_ERR_SSL_TIMEOUT");
@@ -701,21 +753,57 @@ bool mqtt_cycle_read(uint8_t &out_type)
         return false;
     }
 
-    out_type = buf[0] >> 4;
+    // Fixed header: Remaining Length
+    uint32_t remaining{}, multiplier{1};
+    for (uint_fast8_t i = 0; i < 4; ++i) {
+        uint8_t b{};
+        if (!ssl_read_exact(&b, 1)) {
+            return false;
+        }
+        remaining += (b & 0x7F) * multiplier;
+        multiplier *= 128;
+        if (!(b & 0x80)) {
+            break;
+        }
+    }
+
+    // Body: keep what fits in the buffer and drop the rest
+    uint8_t buf[256]{};
+    const uint32_t kept = std::min<uint32_t>(remaining, sizeof(buf));
+    if (!ssl_read_exact(buf, kept)) {
+        return false;
+    }
+    for (uint32_t left = remaining - kept; left;) {
+        uint8_t drop[64]{};
+        const uint32_t n = std::min<uint32_t>(left, sizeof(drop));
+        if (!ssl_read_exact(drop, n)) {
+            return false;
+        }
+        left -= n;
+    }
+
+    out_type = header >> 4;
     switch (out_type) {
         case 3: {  // PUBLISH
-            uint16_t topic_len = (buf[2] << 8) | buf[3];
-            if (topic_len + 4 > ret) {
+            if (kept < 2) {
+                M5_LOGE("Invalid PUBLISH packet (too short)");
+                return false;
+            }
+            const uint16_t topic_len = (buf[0] << 8) | buf[1];
+            // Packet Identifier follows the topic when QoS > 0
+            const uint32_t offset = 2 + topic_len + (((header >> 1) & 0x03) ? 2 : 0);
+            if (offset > kept) {
                 M5_LOGE("Invalid PUBLISH packet (too short)");
                 return false;
             }
 
-            char topic[64]{};
-            memcpy(topic, &buf[4], topic_len);
+            // Truncate to the buffers (keep the terminating '\0')
+            char topic[128]{};
+            memcpy(topic, &buf[2], std::min<uint32_t>(topic_len, sizeof(topic) - 1));
 
             char payload[128]{};
-            uint16_t payload_len = ret - 4 - topic_len;
-            memcpy(payload, &buf[4 + topic_len], payload_len);
+            const uint32_t payload_len = std::min<uint32_t>(kept - offset, sizeof(payload) - 1);
+            memcpy(payload, &buf[offset], payload_len);
 
             mqtt_payload_handler(topic, payload, payload_len);
             break;
@@ -755,57 +843,50 @@ bool mqtt_wait_for(uint8_t expected_type, uint32_t timeout_ms)
 
 bool publishMQTTMessage(const char *top_topic, const char *sub_topic, const char *message, const bool qos1 = false)
 {
-    uint8_t publish_pkt[256]{};
+    uint8_t body[256]{};
 
     // Build topic
     char full_topic[128]{};
-    strcpy(full_topic, top_topic);
-    if (sub_topic && sub_topic[0]) {
-        if (sub_topic[0] != '/') {
-            strcat(full_topic, "/");
-        }
-        strcat(full_topic, sub_topic);
+    const char *sub = sub_topic ? sub_topic : "";
+    const char *sep = (sub[0] && sub[0] != '/') ? "/" : "";
+    if (strlen(top_topic) + strlen(sep) + strlen(sub) >= sizeof(full_topic)) {
+        M5_LOGE("Topic too long");
+        return false;
     }
-    uint16_t topic_len = strlen(full_topic);
-    size_t message_len = strlen(message);
+    strcpy(full_topic, top_topic);
+    strcat(full_topic, sep);
+    strcat(full_topic, sub);
+    const uint16_t topic_len = strlen(full_topic);
+    const size_t message_len = strlen(message);
 
-    if (topic_len > 127 || message_len > 100) {
+    if (2 + topic_len + 2 + message_len > sizeof(body)) {
         M5_LOGE("Topic or payload too long");
         return false;
     }
 
-    // Fixed Header
-    publish_pkt[0] = 0x30 | (qos1 ? 0x02 : 0x00);  // Packet Type:PUBLISH| QoS bits
-    publish_pkt[1] = 0;                            // Remaining Length
-
-    uint32_t pos = 2;
+    uint32_t pos = 0;
 
     // Variable Header
-    publish_pkt[pos++] = (topic_len >> 8) & 0xFF;
-    publish_pkt[pos++] = topic_len & 0xFF;
-    memcpy(publish_pkt + pos, full_topic, topic_len);
+    body[pos++] = (topic_len >> 8) & 0xFF;
+    body[pos++] = topic_len & 0xFF;
+    memcpy(body + pos, full_topic, topic_len);
     pos += topic_len;
 
     // QoS1: Packet Identifier
     if (qos1) {
         uint16_t packet_id = get_next_packet_id();
-        publish_pkt[pos++] = (packet_id >> 8) & 0xFF;
-        publish_pkt[pos++] = packet_id & 0xFF;
+        body[pos++]        = (packet_id >> 8) & 0xFF;
+        body[pos++]        = packet_id & 0xFF;
     }
 
     // Payload
-    memcpy(publish_pkt + pos, message, message_len);
+    memcpy(body + pos, message, message_len);
     pos += message_len;
-
-    // Remaining Length
-    uint8_t remaining_len = pos - 2;
-    publish_pkt[1]        = remaining_len;
 
     M5_LOGD("Try Publish %s/%s %s (QoS=%d)", top_topic, sub_topic, message, qos1 ? 1 : 0);
 
-    int ret = mbedtls_ssl_write(&ssl, publish_pkt, pos);
-    if (ret <= 0) {
-        M5_LOGE("mbedtls_ssl_write failed: -0x%x", -ret);
+    // Packet Type: PUBLISH | QoS bits
+    if (!send_mqtt_packet(0x30 | (qos1 ? 0x02 : 0x00), body, pos)) {
         return false;
     }
 
@@ -816,10 +897,14 @@ bool publishMQTTMessage(const char *top_topic, const char *sub_topic, const char
 
 bool connectMQTT(const char *client_id)
 {
-    uint8_t connect_pkt[128]{0x10, 0x00};  // Packet Type: CONNECT, Remaining Length
+    uint8_t connect_pkt[128]{};
     const uint32_t client_id_len = strlen(client_id);
+    if (12 + client_id_len > sizeof(connect_pkt)) {
+        M5_LOGE("Client ID too long");
+        return false;
+    }
 
-    uint32_t pos = 2;
+    uint32_t pos = 0;
 
     // Protocol Name "MQTT"
     connect_pkt[pos++] = 0x00;
@@ -845,14 +930,10 @@ bool connectMQTT(const char *client_id)
     memcpy(connect_pkt + pos, client_id, client_id_len);
     pos += client_id_len;
 
-    // Fixed Header: Remaining Length
-    connect_pkt[1] = pos - 2;
-
     M5_LOGD("Try MQTT CONNECT [%s]", client_id);
 
-    int ret = mbedtls_ssl_write(&ssl, connect_pkt, pos);
-    if (ret <= 0) {
-        M5_LOGE("mbedtls_ssl_write CONNECT failed: -0x%x", -ret);
+    // Packet Type: CONNECT
+    if (!send_mqtt_packet(0x10, connect_pkt, pos)) {
         return false;
     }
 
@@ -865,11 +946,12 @@ bool subscribeMQTT(const char *topic)
     uint16_t packet_id = get_next_packet_id();
     uint16_t topic_len = strlen(topic);
     uint8_t subscribe_pkt[128]{};
+    if (2 + 2 + topic_len + 1 > sizeof(subscribe_pkt)) {
+        M5_LOGE("Topic too long");
+        return false;
+    }
 
     uint32_t pos         = 0;
-    subscribe_pkt[pos++] = 0x82;                   // Packet Type: SUBSCRIBE + QoS1
-    subscribe_pkt[pos++] = 2 + 2 + topic_len + 1;  // Remaining Length
-
     subscribe_pkt[pos++] = (packet_id >> 8) & 0xFF;
     subscribe_pkt[pos++] = packet_id & 0xFF;
 
@@ -881,9 +963,8 @@ bool subscribeMQTT(const char *topic)
 
     M5_LOGD("Try MQTT SUBSCRIBE [%s]", topic);
 
-    int ret = mbedtls_ssl_write(&ssl, subscribe_pkt, pos);
-    if (ret <= 0) {
-        M5_LOGE("mbedtls_ssl_write failed: -0x%x", -ret);
+    // Packet Type: SUBSCRIBE (reserved bits 0b0010)
+    if (!send_mqtt_packet(0x82, subscribe_pkt, pos)) {
         return false;
     }
 
