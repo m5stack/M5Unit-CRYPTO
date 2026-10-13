@@ -19,11 +19,11 @@ Core2 for AWS is a dedicated kit for AWS IoT learning projects. It consists of t
 
 
 ## Related Link
-See also examples using conventional methods here.
 
 - [Unit ID & Datasheet](https://docs.m5stack.com/en/unit/id)
+- [Core2 for AWS](https://docs.m5stack.com/en/products/sku/K010-AWS)
 
-### Required Libraries:
+### Required Libraries
 - [M5UnitUnified](https://github.com/m5stack/M5UnitUnified)
 - [M5Utility](https://github.com/m5stack/M5Utility)
 - [M5HAL](https://github.com/m5stack/M5HAL)
@@ -55,9 +55,10 @@ you must enable the define symbol below.
 ```
 
 ### For ESP-IDF settings
-PlotToSerial and ViaPaHub can be built with ESP-IDF (>= 5.1).
+PlotToSerial and ViaPaHub can be built with ESP-IDF 5.1 or later (5.x and 6.x).
 Blinky-Hello-World can be built with ESP-IDF 5.x; see [its README](examples/UnitUnified/UnitID/Blinky-Hello-World) for the settings.
 To use the built-in ATECC608B on **M5Stack Core2 for AWS (SKU:K010-AWS)** in PlotToSerial, choose it in menuconfig.
+The choice is passed to the source as `USING_M5CORE2_AWS_BUILTIN` by `examples/UnitUnified/common/variant.cmake`, so the source does not need to be edited.
 
 ```sh
 cd examples/UnitUnified/UnitID/PlotToSerial
@@ -70,11 +71,6 @@ idf.py build flash monitor
 ```
 
 ViaPaHub has no variant; run `idf.py set-target <chip>` and `idf.py build flash monitor`.
-
-> [!NOTE]
-> With ESP-IDF 5.2 or later, waking the ATECC608B on boards whose GROVE port uses a new I2C master bus
-> (CoreS3, Core2 port A, AtomS3, StampS3, StickC series, Tab5, ...) requires M5UnitUnified 0.6.1 or later.
-> Core, NanoC6, NanoH2, NessoN1 and the Core2 for AWS built-in chip work with the current release.
 
 ## Support via [PaHub](https://docs.m5stack.com/en/unit/Unit-PaHub%20v2.1)
 
@@ -98,6 +94,5 @@ If you want to output Git commit hashes to html, do it for the git cloned folder
 
 ### Required
 - [Doxygen](https://www.doxygen.nl/)
-- [pcregrep](https://formulae.brew.sh/formula/pcre2)
 - [Git](https://git-scm.com/) (Output commit hash to html)
 
