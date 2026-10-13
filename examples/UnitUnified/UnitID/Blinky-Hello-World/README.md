@@ -76,26 +76,23 @@ Run the script in [scripts](scripts) from this example directory
 | region            | AWS IoT Region|
 
 
-example:
+The script needs the [AWS CLI](https://aws.amazon.com/cli/) (configured with your credentials) and OpenSSL.
+It creates or reuses the policy, the thing type, the Thing and the certificate, so it can be run again.
+
+example (first run in the region):
 ```log
 ./scripts/aws_register_thing.sh device_cert.crt 0123456789ABCDEF01 us-east-1
 [1/6] Validating inputs...
 Device certificate valid.
 Region "us-east-1" is valid.
 [2/6] Creating or confirming policy "M5Unit-ID-Policy"...
-Policy exists.
-[3/6] Deleting and recreating thing "0123456789ABCDEF01"...
-Thing deleted.
-{
-    "thingName": "0123456789ABCDEF01",
-    "thingArn": "arn:aws:iot:us-east-1:123456789012:thing/0123456789ABCDEF01",
-    "thingId": "01234567-89ab-cdef-0123-456789abcdef"
-}
+Policy created.
+[3/6] Creating or confirming thing "0123456789ABCDEF01"...
+Creating thing type "m5unit-id"...
 Thing "0123456789ABCDEF01" created.
 [4/6] Checking or registering certificate...
-Looking for matching certificate in current region...
-Found matching certificate: arn:aws:iot:us-east-1:123456789012:cert/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-Reusing existing certificate.
+Registering new certificate...
+Certificate: arn:aws:iot:us-east-1:123456789012:cert/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 [5/6] Attaching certificate to thing...
 [6/6] Attaching policy...
 DONE. Thing "0123456789ABCDEF01" is ready and bound to certificate.
@@ -104,6 +101,12 @@ AWS IoT Endpoint
     "endpointAddress": "exampleexample-ats.iot.region.amazonaws.com"
 }
 ```
+
+#### Amazon Root CA
+The example embeds Amazon Root CA 1 (`root_ca_der[]` in main/Blinky-Hello-World.cpp), so you do not need to download it.
+[scripts/download_aws_root.sh](scripts/download_aws_root.sh) downloads it and saves it as DER (`./data/AmazonRootCA1.der`)
+if you want to check or replace the embedded certificate.
+
 ### 3. Build settings
 
 #### ArduinoIDE
