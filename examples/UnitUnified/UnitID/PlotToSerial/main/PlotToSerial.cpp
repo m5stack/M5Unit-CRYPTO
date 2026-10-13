@@ -10,10 +10,11 @@
 #include <M5UnitUnified.h>
 #include <M5UnitUnifiedCRYPTO.h>
 #include <M5Utility.h>
+#include <vector>
 #include <wiring/m5_unit_unified_wiring.hpp>  // Board-aware connection helpers (include last)
 
-// Enable this define when using M5Core2AWS's built-in chip
 #if !defined(USING_M5CORE2_AWS_BUILTIN)
+// For Core2 for AWS built-in ATECC608B (K010-AWS)
 // #define USING_M5CORE2_AWS_BUILTIN
 #endif
 
@@ -104,7 +105,7 @@ void dump_config(const uint8_t c[128])
     }
 }
 
-};  // namespace
+}  // namespace
 
 void setup()
 {
@@ -115,7 +116,7 @@ void setup()
     }
 
 #if defined(USING_M5CORE2_AWS_BUILTIN)
-#pragma message "Using builtin ATECC608B"
+#pragma message("Using builtin ATECC608B")
     // Core2 AWS: the built-in ATECC608B is on the internal bus (M5.In_I2C)
     if (M5.getBoard() != m5::board_t::board_M5StackCore2) {
         M5_LOGE("Only Core2AWS");
@@ -134,15 +135,6 @@ void setup()
     M5_LOGI("%s", Units.debugInfo().c_str());
     lcd.fillScreen(TFT_DARKGREEN);
 
-    // Diagnostic mode: Units.begin() includes readRevision in unit.begin().
-    // Stop here to evaluate wakeup/revision stability without additional API load.
-    constexpr bool DIAG_REVISION_ONLY = false;
-    if (DIAG_REVISION_ONLY) {
-        M5_LOGI("DIAG_REVISION_ONLY=1: skip readConfigZone/readOTPZone/readDataZone...");
-        return;
-    }
-
-    // Step mode for staged recovery.
     uint8_t config[128]{};
     if (!unit.readConfigZone(config)) {
         M5_LOGE("readConfigZone NG");
@@ -153,8 +145,8 @@ void setup()
         M5_LOGE("readOTPZone NG");
     }
 
-    uint8_t data[unit.getSlotSize(Slot::GeneralData)]{};
-    if (!unit.readDataZone(data, sizeof(data), Slot::GeneralData)) {
+    std::vector<uint8_t> data(unit.getSlotSize(Slot::GeneralData));
+    if (!unit.readDataZone(data.data(), data.size(), Slot::GeneralData)) {
         M5_LOGE("readDataZone NG");
     }
 
@@ -191,7 +183,7 @@ void setup()
     m5::utility::log::dump(otp, sizeof(otp), false);
 
     M5.Log.printf("Dump Data zone (8:GeneralData) ----------------\n");
-    m5::utility::log::dump(data, sizeof(data), false);
+    m5::utility::log::dump(data.data(), data.size(), false);
 
     M5.Log.printf("KeyValid ----------------\n");
     m5::utility::log::dump(key_valid, sizeof(key_valid), false);
