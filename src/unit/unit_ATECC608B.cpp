@@ -797,7 +797,7 @@ bool UnitATECC608B::verify(uint8_t mac[32], const uint8_t mode, const uint16_t p
 
 //
 bool UnitATECC608B::send_command(const uint8_t opcode, const uint8_t param1, const uint16_t param2, const uint8_t* data,
-                                 uint32_t dlen)
+                                 const uint32_t dlen)
 {
     constexpr uint32_t MAX_DLEN{148};  // Max data: packet = dlen+8, count byte max 155
     if (dlen > MAX_DLEN) {

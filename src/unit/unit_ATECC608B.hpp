@@ -12,7 +12,6 @@
 
 #include "atecc608.hpp"
 #include <M5UnitComponent.hpp>
-#include <m5_utility/container/circular_buffer.hpp>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -23,6 +22,7 @@ namespace unit {
 /*!
   @class m5::unit::UnitATECC608B
   @brief ATECC608B unit
+  @note Not supported: UpdateExtra, Write, AES, CheckMac, GenDig, KDF, MAC
 */
 class UnitATECC608B : public Component {
     M5_UNIT_COMPONENT_HPP_BUILDER(UnitATECC608B, 0x35);
@@ -53,7 +53,7 @@ public:
     ///@name Settings for begin
     ///@{
     /*! @brief Gets the configuration */
-    inline config_t config()
+    inline config_t config() const
     {
         return _cfg;
     }
@@ -77,7 +77,7 @@ public:
     //! @brief Gets the size of the specified data slot in bytes
     inline uint16_t getSlotSize(const atecc608::Slot slot) const
     {
-        return _slotSize[m5::stl::to_underlying(slot)];
+        return _slot_size[m5::stl::to_underlying(slot)];
     }
 
     ///@name State transition
@@ -85,8 +85,8 @@ public:
     /*!
       @brief Device to active
       @return True if successful
-      @note The following error message is output, but can be ignored
-      @note "write_with_transaction(): 2 endTransmission stop:1"
+      @note Wakes the device with an SDA pulse driven through AdapterI2C::releasePins()
+      @note Fails on a bus whose pins cannot be released (LP I2C, ESP32-P4 GPIO0-15 used as LP IO, non-ESP builds)
      */
     bool wakeup();
     /*!
@@ -133,7 +133,7 @@ public:
     ///@{
     /*!
       @brief Read the revision
-      @param[out] data[4] Output buffer at least 4 bytes
+      @param[out] data Output buffer at least 4 bytes
       @return True if successful
      */
     bool readRevision(uint8_t data[4]);
@@ -263,7 +263,6 @@ public:
       @param upper The upper bound (exclusive)
       @return True if successful
       @note Output range is [lower, upper) - that is, lower <= value < upper
-      @warning Note that if the difference between lower and higher is too large, nan/inf will result
     */
     template <typename T, typename std::enable_if<std::is_floating_point<T>::value, std::nullptr_t>::type = nullptr>
     bool readRandom(T& value, const T lower, const T upper)
@@ -281,9 +280,14 @@ public:
         memcpy(&raw, rv, sizeof(uint32_t));  // use first 4 bytes
 
         // convert to [0.0, 1.0)
-        constexpr double norm = 1.0 / (static_cast<double>(std::numeric_limits<uint32_t>::max()) + 1.0);
-        double r              = static_cast<double>(raw) * norm;
-        value                 = static_cast<T>(lower + r * static_cast<double>(upper - lower));
+        using real_t      = typename std::common_type<T, double>::type;
+        const real_t norm = real_t(1) / (static_cast<real_t>(std::numeric_limits<uint32_t>::max()) + real_t(1));
+        const real_t r    = static_cast<real_t>(raw) * norm;
+        // Interpolate without (upper - lower), which overflows for a range wider than max (e.g. [lowest, max))
+        value = static_cast<T>(static_cast<real_t>(lower) * (real_t(1) - r) + static_cast<real_t>(upper) * r);
+        if (value >= upper) {  // Rounding may reach upper
+            value = std::nextafter(upper, lower);
+        }
         return std::isfinite(value);
     }
     /*!
@@ -316,19 +320,20 @@ public:
     ///@{
     /*!
       @brief Read the config zone
-      @param[out] config[128] Output buffer at least 128 bytes
+      @param[out] config Output buffer at least 128 bytes
+      @return True if successful
      */
     bool readConfigZone(uint8_t config[128]);
 
     /*!
       @brief Read the serial number
-      @param[out] sn[9] Output buffer at least 9 bytes
+      @param[out] sn Output buffer at least 9 bytes
       @return True if successful
      */
     bool readSerialNumber(uint8_t sn[9]);
     /*!
       @brief Read the serial number as string
-      @param[out] str[19] Output buffer at least 19 bytes
+      @param[out] str Output buffer at least 19 bytes
       @return True if successful
      */
     bool readSerialNumber(char str[19]);
@@ -341,9 +346,10 @@ public:
      */
     bool readZoneLocked(bool& configLocked, bool& dataLocked);
     /*!
-      @brief Read the lock state for data zone
+      @brief Read the SlotLocked bits
       @param[out] slotLockedBits Bits representing the lock status of each slot
       @return True if successful
+      @note A set bit means the slot is locked (the SlotLocked bits in the config zone are inverted)
      */
     bool readSlotLocked(uint16_t& slotLockedBits);
     /*!
@@ -442,8 +448,8 @@ public:
     }
     ///@}
 
-    ///@warning For TNGTLS, the ECDH command may be run using the ECC private keys stored in Slots 0 and 2-4
     ///@name ECDH
+    ///@warning For TNGTLS, the ECDH command may be run using the ECC private keys stored in Slots 0 and 2-4
     ///@{
     /*!
       @brief ECDH (Plain text)
@@ -622,7 +628,7 @@ public:
       @param signature Signature to be verified
       @param pubKey  public key to be used for verification
       @param src Message source
-      @return True if successful
+      @return True if the signature is verified
      */
     inline bool verifyExternal(uint8_t mac[32], const uint8_t signature[64], const uint8_t pubKey[64],
                                const atecc608::Source src)
@@ -637,7 +643,7 @@ public:
       @param signature Signature to be verified
       @param slot Slot containing the public key to be used for the verification
       @param src Message source
-      @return True if successful
+      @return True if the signature is verified
      */
     inline bool verifyStored(uint8_t mac[32], const uint8_t signature[64], const atecc608::Slot slot,
                              const atecc608::Source src)
@@ -653,23 +659,21 @@ public:
     /*!
       @brief Self test
       @param[out] resultBits The bit corresponding to a failed test is set
-      @param testBits Bits to be tested
+      @param testBits Bits to be tested. 0 reads the result of the last self test (failure register)
       @return True if successful
       @note bits
       |b[7:6]|b[5]|b[4]|b[3]|b[2]|b[1]|b[0]|
       |---|---|---|---|---|---|---|
-      |00|SHA|AES|ECDH|EECDSA|0|RNG,DRBG|
+      |00|SHA|AES|ECDH|ECDSA|0|RNG,DRBG|
      */
     bool selfTest(uint8_t& resultBits, const uint8_t testBits = 0x3D /* All */);
     ///@}
-
-    // @todo UpdateExtra, Write, AES, CheckMac, GenDig, KDF, MAC command support
 
 protected:
     virtual bool begin_impl();
 
     bool send_command(const uint8_t opcode, const uint8_t param1 = 0, const uint16_t param2 = 0,
-                      const uint8_t* data = nullptr, uint32_t dlen = 0);
+                      const uint8_t* data = nullptr, const uint32_t dlen = 0);
     bool receive_response(uint8_t* data, const uint32_t dlen);
 
     bool counter(uint32_t& value, const uint8_t counter, const uint8_t mode);
@@ -695,7 +699,7 @@ protected:
 private:
     config_t _cfg{};
     std::array<uint8_t, 4> _revision{};
-    std::array<uint16_t, 16> _slotSize{
+    std::array<uint16_t, 16> _slot_size{
         36,  36, 36, 36, 36, 36, 36, 36,  // slot 0〜7
         416,                              // slot 8
         72,  72, 72, 72, 72, 72, 72       // slot 9〜15
