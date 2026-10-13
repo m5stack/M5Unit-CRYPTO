@@ -886,9 +886,10 @@ TEST_F(TestATECC608B_TNGTLS, ZoneLock)
     // Slot lock status
     uint16_t slotLockedBits{};
     EXPECT_TRUE(unit->readSlotLocked(slotLockedBits));
-    // On TNGTLS, Slots 0 and 1 should be individually locked (bit=0 means locked)
-    EXPECT_EQ(slotLockedBits & (1 << 0), 0) << "Slot 0 should be locked";
-    EXPECT_EQ(slotLockedBits & (1 << 1), 0) << "Slot 1 should be locked";
+    // Slots 0 and 1 cannot be individually locked on TNGTLS (only 2-4, 6 and 8 can),
+    // so their bits are 0 (a set bit means locked)
+    EXPECT_EQ(slotLockedBits & (1 << 0), 0) << "Slot 0 cannot be individually locked";
+    EXPECT_EQ(slotLockedBits & (1 << 1), 0) << "Slot 1 cannot be individually locked";
 
     // Matches the SlotLocked bytes (offset 88-89, little endian, inverted) in the config zone
     uint8_t config[128]{};
@@ -1190,6 +1191,21 @@ TEST_F(TestATECC608B_TNGTLS, WakeupIdleSleep)
     EXPECT_TRUE(unit->wakeup());
     EXPECT_TRUE(unit->readDeviceState(state));
     EXPECT_FALSE(is_valid_tempkey(state)) << "TempKey should be cleared after sleep";
+
+    // idle() / sleep() report the result: a device that is not awake does not ACK (state is idle here)
+    EXPECT_FALSE(unit->idle());
+    EXPECT_FALSE(unit->sleep());
+
+    // Waking up an awake device (it may go through the retry) keeps TempKey
+    EXPECT_TRUE(unit->writeNonce32(Destination::TempKey,
+                                   (const uint8_t[]){0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B,
+                                                     0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
+                                                     0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40}));
+    EXPECT_TRUE(unit->wakeup());
+    EXPECT_TRUE(unit->wakeup());
+    EXPECT_TRUE(unit->idle());
+    EXPECT_TRUE(unit->readDeviceState(state));
+    EXPECT_TRUE(is_valid_tempkey(state)) << "TempKey should survive waking up an awake device";
 }
 
 TEST_F(TestATECC608B_TNGTLS, Counter_InvalidID)
