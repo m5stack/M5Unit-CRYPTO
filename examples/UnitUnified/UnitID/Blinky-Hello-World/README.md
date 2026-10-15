@@ -152,6 +152,7 @@ build_flags = ${option_release.build_flags}
 #### ESP-IDF
 ESP-IDF 5.x (>= 5.1) or 6.1 and later, on a Wi-Fi capable chip (esp32 / esp32s3 / esp32c3 / esp32c5 / esp32c6).  
 ESP-IDF 6.0 is not supported: its mbedtls 4 has no PSA secure element driver, which signs the TLS handshake with the ATECC608B on 6.1.  
+Tab5 (ESP32-P4) has no on-die radio; its Wi-Fi runs on the ESP32-C6 co-processor over SDIO and needs ESP-IDF >= 5.3 (esp_wifi_remote + esp_hosted, pulled in automatically; the SDIO preset is in sdkconfig.defaults.esp32p4).  
 Set the Wi-Fi and AWS IoT settings in menuconfig.
 
 ```sh

@@ -90,6 +90,9 @@ jobs:
           - {example: Blinky-Hello-World, target: esp32c6, idf: v5.5.4, config: ''}
           - {example: Blinky-Hello-World, target: esp32, idf: v5.1.7, config: ''}
           - {example: Blinky-Hello-World, target: esp32, idf: v6.1, config: ''}  # mbedtls 4 (PSA)
+          # Tab5 (ESP32-P4): Wi-Fi via the ESP32-C6 co-processor (esp_wifi_remote + esp_hosted, IDF >= 5.3)
+          - {example: Blinky-Hello-World, target: esp32p4, idf: v5.5.4, config: ''}
+          - {example: Blinky-Hello-World, target: esp32p4, idf: v6.1, config: ''}
           - {example: PlotToSerial, target: esp32, idf: v5.5.4, config: 'CONFIG_EXAMPLE_USING_M5CORE2_AWS_BUILTIN=y'}
           - {example: PlotToSerial, target: esp32, idf: v5.1.7, config: 'CONFIG_EXAMPLE_USING_M5CORE2_AWS_BUILTIN=y'}  # legacy driver
           - {example: PlotToSerial, target: esp32, idf: v6.1, config: 'CONFIG_EXAMPLE_USING_M5CORE2_AWS_BUILTIN=y'}

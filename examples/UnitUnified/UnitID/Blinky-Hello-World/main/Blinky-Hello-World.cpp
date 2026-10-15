@@ -15,19 +15,7 @@
 #include <esp_system.h>
 #include <algorithm>
 #include <cstring>
-#if defined(ARDUINO)
-#include <WiFi.h>
-#else
-#include <esp_event.h>
-#include <esp_netif.h>
-#include <esp_wifi.h>
-#include <freertos/event_groups.h>
-#include <nvs_flash.h>
 #include <esp_idf_version.h>
-#if !CONFIG_SOC_WIFI_SUPPORTED
-#error "This example needs a Wi-Fi capable target (esp32 / esp32s3 / esp32c3 / esp32c5 / esp32c6)"
-#endif
-#endif
 
 #include <mbedtls/ssl.h>
 #include <mbedtls/net_sockets.h>
@@ -36,6 +24,8 @@
 
 // The TLS device key in the ATECC608B (the only part that depends on the mbedtls version)
 #include "../src/device_key.hpp"
+// Wi-Fi station connect (esp_wifi for both frameworks; handles esp_hosted boards such as Tab5)
+#include "../src/wifi_connect.hpp"
 
 using namespace m5::unit::atecc608;
 
@@ -242,116 +232,6 @@ void print_provisioning(m5::unit::UnitID &u)
     M5.Log.printf("DeviceCert:\n");
     printPEM(cert, clen);
 }
-
-// Both versions keep reconnecting until connected. After a reset without disconnecting, an access point with
-// PMF (WPA3) still holds the old association and refuses the first attempts for a while (comeback time)
-constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS{20000};
-
-#if defined(ARDUINO)
-bool connectWiFi()
-{
-    // Tab5 (ESP32-P4) uses ESP32-C6 co-processor for WiFi via SDIO; set pins before WiFi.begin()
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-    if (M5.getBoard() == m5::board_t::board_M5Tab5) {
-        constexpr int SDIO2_CLK = 12;
-        constexpr int SDIO2_CMD = 13;
-        constexpr int SDIO2_D0  = 11;
-        constexpr int SDIO2_D1  = 10;
-        constexpr int SDIO2_D2  = 9;
-        constexpr int SDIO2_D3  = 8;
-        constexpr int SDIO2_RST = 15;
-        WiFi.setPins(SDIO2_CLK, SDIO2_CMD, SDIO2_D0, SDIO2_D1, SDIO2_D2, SDIO2_D3, SDIO2_RST);
-    }
-#endif
-
-    WiFi.mode(WIFI_STA);
-    if (ssid && ssid[0] && password && password[0]) {
-        M5_LOGI("Use ssid:%s and password", ssid);
-        WiFi.begin(ssid, password);
-    } else {
-        M5_LOGI("Use inner credential");
-        WiFi.begin();
-    }
-    const auto start_at = m5::utility::millis();
-    while (m5::utility::millis() - start_at < WIFI_CONNECT_TIMEOUT_MS) {
-        m5::utility::delay(500);
-        if (WiFi.status() == WL_CONNECTED) {
-            return true;
-        }
-        M5.Log.print(".\n");
-    }
-    return false;
-}
-#else
-EventGroupHandle_t wifi_events{};
-constexpr EventBits_t WIFI_CONNECTED_BIT{BIT0};
-
-void on_wifi_event(void *, esp_event_base_t base, int32_t id, void *)
-{
-    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
-        // Keep reconnecting, like the auto reconnect of Arduino WiFi
-        xEventGroupClearBits(wifi_events, WIFI_CONNECTED_BIT);
-        esp_wifi_connect();
-    } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
-        xEventGroupSetBits(wifi_events, WIFI_CONNECTED_BIT);
-    }
-}
-
-bool connectWiFi()
-{
-    // Wi-Fi keeps its calibration data and the stored station config in NVS
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        nvs_flash_erase();
-        err = nvs_flash_init();
-    }
-    if (err != ESP_OK) {
-        M5_LOGE("nvs_flash_init failed %d", err);
-        return false;
-    }
-
-    wifi_events = xEventGroupCreate();
-    err         = esp_event_loop_create_default();
-    if (!wifi_events || esp_netif_init() != ESP_OK || (err != ESP_OK && err != ESP_ERR_INVALID_STATE)) {
-        M5_LOGE("Failed to initialize the network stack");
-        return false;
-    }
-    esp_netif_create_default_wifi_sta();
-
-    wifi_init_config_t init_cfg = WIFI_INIT_CONFIG_DEFAULT();
-    if (esp_wifi_init(&init_cfg) != ESP_OK ||
-        esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi_event, nullptr, nullptr) != ESP_OK ||
-        esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_wifi_event, nullptr, nullptr) != ESP_OK ||
-        esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK) {
-        M5_LOGE("Failed to initialize Wi-Fi");
-        return false;
-    }
-
-    if (ssid && ssid[0] && password && password[0]) {
-        M5_LOGI("Use ssid:%s and password", ssid);
-        wifi_config_t cfg{};
-        memcpy(cfg.sta.ssid, ssid, std::min(strlen(ssid), sizeof(cfg.sta.ssid)));
-        memcpy(cfg.sta.password, password, std::min(strlen(password), sizeof(cfg.sta.password) - 1));
-        if (esp_wifi_set_config(WIFI_IF_STA, &cfg) != ESP_OK) {
-            M5_LOGE("esp_wifi_set_config failed");
-            return false;
-        }
-    } else {
-        // The station config stored in NVS by an earlier connection
-        M5_LOGI("Use inner credential");
-    }
-    if (esp_wifi_start() != ESP_OK) {
-        M5_LOGE("esp_wifi_start failed");
-        return false;
-    }
-
-    const EventBits_t bits =
-        xEventGroupWaitBits(wifi_events, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, pdMS_TO_TICKS(WIFI_CONNECT_TIMEOUT_MS));
-    return (bits & WIFI_CONNECTED_BIT) != 0;
-}
-#endif
 
 int verify_cert(void *data, mbedtls_x509_crt *crt, int depth, uint32_t *flags)
 {
@@ -947,7 +827,7 @@ void setup()
     // WiFi
     M5_LOGI("Free heap before WiFi: %u / min: %u", (unsigned)esp_get_free_heap_size(),
             (unsigned)esp_get_minimum_free_heap_size());
-    if (!connectWiFi()) {
+    if (!wifi_connect::begin(ssid, password)) {
         M5_LOGE("connectWiFi failed!");
         m5::unit::wiring::failStop();
     }
