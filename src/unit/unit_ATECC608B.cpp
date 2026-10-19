@@ -864,13 +864,17 @@ bool UnitATECC608B::receive_response(uint8_t* data, const uint32_t dlen)
         return false;
     }
 
-    memset(data, 0, dlen);
-
     // Read entire response in a single I2C transaction: count(1) + data(dlen) + CRC(2)
     // This avoids splitting the read into two transactions, which causes read timeout
     // on m5gfx I2C (I2C_Class) when the body exceeds ~32 bytes.
     const uint32_t max_read = dlen + 3;
     uint8_t rbuf[158]{};  // Max: dlen(max 155) + 3 = 158
+    if (max_read > sizeof(rbuf)) {
+        M5_LIB_LOGE("Response too large: dlen:%u", dlen);
+        return false;
+    }
+
+    memset(data, 0, dlen);
     auto rerr = readWithTransaction(rbuf, max_read);
     if (rerr != m5::hal::error::error_t::OK) {
         M5_LIB_LOGE("Failed to read response");
