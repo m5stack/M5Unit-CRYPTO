@@ -64,19 +64,9 @@ void on_event(void *, esp_event_base_t base, int32_t id, void *)
 //! @brief Connect as a station. ssid/password may be null/empty to use the config stored in NVS
 bool begin(const char *ssid, const char *password, const uint32_t timeout_ms = DEFAULT_TIMEOUT_MS)
 {
-#if !defined(ARDUINO) && defined(CONFIG_IDF_TARGET_ESP32P4)
-    // Tab5 (ESP-IDF): power on the ESP32-C6 before esp_wifi_init triggers the esp_hosted SDIO transport.
-    // WLAN_PWR_EN is P0 of the second I/O expander (PI4IOE5V6408 @0x44 = M5.getIOExpander(1)). The Arduino
-    // core does this inside WiFi.begin; M5Unified's board init only begin()s the expander, so we drive it here.
-    // (M5Unified should expose this; until then the example enables it. See the WLAN power control in
-    // M5Tab5-UserDemo's bsp_set_wifi_power_enable.)
-    if (M5.getBoard() == m5::board_t::board_M5Tab5) {
-        auto &ioexp = M5.getIOExpander(1);
-        ioexp.setDirection(0, true);  // WLAN_PWR_EN as output
-        ioexp.digitalWrite(0, true);  // power on the ESP32-C6
-        m5::utility::delay(1500);     // let the C6 boot its esp_hosted slave firmware before SDIO
-    }
-#endif
+    // Tab5 (ESP-IDF): the ESP32-C6 is powered by default, so no WLAN_PWR_EN handling is needed here. esp_hosted
+    // brings up the SDIO transport on its own; what actually lets the C6 come up is the ACTIVE_HIGH SDIO reset in
+    // sdkconfig.defaults.esp32p4 (the preset there also sets the pins).
 #if defined(ARDUINO) && defined(CONFIG_ESP_HOSTED_ENABLED)
     // The companion chip, bus and pins are board-specific (not every ESP32-P4 uses an ESP32-C6), so this is
     // keyed on the board. The ESP-IDF build gets the same from esp_hosted's Tab5 preset (sdkconfig.defaults.esp32p4).
