@@ -236,7 +236,8 @@ extern const uint32_t template_for_signer_size;
 ///@name Certificate size
 ///@{
 /*!
-  The DER signature at the end of a certificate is 73-75 bytes long (an INTEGER gets a leading 0x00 when its MSB is 1),
+  The DER signature at the end of a certificate is at most 75 bytes long (each INTEGER gets a leading 0x00 when its MSB
+  is 1),
   so a certificate can be longer than its template. Give an output buffer of at least these sizes
 */
 constexpr uint16_t MAX_DEVICE_CERTIFICATE_SIZE{548};  //!< Device certificate (template 546 + 2)
