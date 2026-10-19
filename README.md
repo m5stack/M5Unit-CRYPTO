@@ -56,7 +56,7 @@ you must enable the define symbol below.
 
 ### For ESP-IDF settings
 PlotToSerial and ViaPaHub can be built with ESP-IDF 5.1 or later (5.x and 6.x).
-Blinky-Hello-World can be built with ESP-IDF 5.x; see [its README](examples/UnitUnified/UnitID/Blinky-Hello-World) for the settings.
+Blinky-Hello-World can be built with ESP-IDF 5.x (>= 5.1) or 6.1 and later (6.0 is not supported); see [its README](examples/UnitUnified/UnitID/Blinky-Hello-World) for the settings.
 To use the built-in ATECC608B on **M5Stack Core2 for AWS (SKU:K010-AWS)** in PlotToSerial, choose it in menuconfig.
 The choice is passed to the source as `USING_M5CORE2_AWS_BUILTIN` by `examples/UnitUnified/common/variant.cmake`, so the source does not need to be edited.
 
