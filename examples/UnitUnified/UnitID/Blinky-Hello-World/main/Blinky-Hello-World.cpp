@@ -738,7 +738,7 @@ bool yieldMQTT(uint32_t timeout_ms)
         }
 
         // Send PINGREQ if needed
-        if (!waiting_pingresp && now - ping_at >= keepAliveMs) {
+        if (!waiting_pingresp && m5::utility::elapsedSince(ping_at, now) >= keepAliveMs) {
             uint8_t pingreq[] = {0xC0, 0x00};
             int ret           = mbedtls_ssl_write(&ssl, pingreq, sizeof(pingreq));
             if (ret > 0) {

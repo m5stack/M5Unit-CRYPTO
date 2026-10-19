@@ -257,7 +257,7 @@ bool insert_certificate_signature(uint8_t* out, uint16_t& olen, const uint32_t t
     const int32_t delta = static_cast<int32_t>(der_sig_size) - static_cast<int32_t>(template_size - offset_signature);
     if (delta) {
         // Outer SEQUENCE length (0x30 0x82 HH LL)
-        uint32_t len = (out[2] << 8) | out[3];
+        uint32_t len = m5::types::big_uint16_t(out[2], out[3]).get();
         len += delta;
         if (len < 128 || len > 65535) {
             M5_LIB_LOGE("Failed to adjust %u", len);
