@@ -22,7 +22,7 @@ namespace unit {
 /*!
   @class m5::unit::UnitATECC608B
   @brief ATECC608B unit
-  @note Not supported: UpdateExtra, Write, AES, CheckMac, GenDig, KDF, MAC
+  @note Not supported: UpdateExtra, AES, CheckMac, GenDig, KDF, MAC
 */
 class UnitATECC608B : public Component {
     M5_UNIT_COMPONENT_HPP_BUILDER(UnitATECC608B, 0x35);
@@ -48,6 +48,11 @@ public:
     {
     }
 
+    /*!
+      @brief Begin the unit
+      @return True if successful
+      @note Wakes and initializes the device; the closing idle/sleep (see config_t::idle) does not affect the result
+     */
     virtual bool begin() override;
 
     ///@name Settings for begin
@@ -577,7 +582,8 @@ public:
     /*!
       @brief Generate digest of a public key and stored in TempKey
       @param slot Public key slot
-      @param otherData Other data for use in digest calculations at least 3 bytes (nullptrAllowed)
+      @param otherData Other data for use in digest calculations, at least 3 bytes. If nullptr, three zero bytes are
+      used (nullptrAllowed)
       @return True if successful
       @warning For TNGTLS, a digest can be created from Slot 11
      */
