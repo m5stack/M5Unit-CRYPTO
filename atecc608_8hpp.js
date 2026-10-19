@@ -1,7 +1,8 @@
 var atecc608_8hpp =
 [
     [ "m5::unit::atecc608::CompCertAccessor", "classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html", "classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor" ],
-    [ "m5::unit::atecc608::CompCertAccessor::DateTime", "structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html", null ],
+    [ "m5::unit::atecc608::CompCertAccessor::DateTime", "structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html", "structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time" ],
+    [ "Destination", "atecc608_8hpp.html#ab4534b425bd46c35acc5afce1442514c", null ],
     [ "Error", "atecc608_8hpp.html#abd49d5d4ffa50931dfed4f02464e91a4", [
       [ "CHECK_MAC_OR_VERIFY_ERROR", "atecc608_8hpp.html#abd49d5d4ffa50931dfed4f02464e91a4a6693b5a8da30a708835ce8fa16a1bb41", null ],
       [ "PARSE_ERROR", "atecc608_8hpp.html#abd49d5d4ffa50931dfed4f02464e91a4a72c6b86560bf298c1c852c39eebf0756", null ],
@@ -36,5 +37,10 @@ var atecc608_8hpp =
     [ "convertToPEM", "atecc608_8hpp.html#a358182add491ea5dcfbf82ea6d0ef784", null ],
     [ "encoded_base64_length", "atecc608_8hpp.html#aa874048a8a3d6e05642f7e5d2f820cd0", null ],
     [ "offset_to_param2_for_config", "atecc608_8hpp.html#aba01731899c8a5d4feaf127f8168203f", null ],
-    [ "slot_block_to_param2", "atecc608_8hpp.html#a9b14f3df0d8153f7b0e33f18b445a6aa", null ]
+    [ "slot_block_to_param2", "atecc608_8hpp.html#a187453b73a7c93175199238cc20fa1cd", null ],
+    [ "MAX_DEVICE_CERTIFICATE_SIZE", "atecc608_8hpp.html#a2c388467f1c3ce6be4a1dcac9ca580a2", null ],
+    [ "MAX_SIGNER_CERTIFICATE_SIZE", "atecc608_8hpp.html#a848a0ca8921e9d8f22f575d69152cf87", null ],
+    [ "ZONE_CONFIG", "atecc608_8hpp.html#a864dc77ba530efc8d70fc7544c3c2c68", null ],
+    [ "ZONE_DATA", "atecc608_8hpp.html#abb7e4553e0dc91c1f6ab57703cc9e468", null ],
+    [ "ZONE_OTP", "atecc608_8hpp.html#a97964d358dffb16f12e0ee498e554674", null ]
 ];

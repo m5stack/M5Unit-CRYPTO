@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['base64_2ecpp_0',['base64.cpp',['../base64_8cpp.html',1,'']]],
-  ['base64_2ehpp_1',['base64.hpp',['../base64_8hpp.html',1,'']]]
+  ['begin_0',['begin',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#accb9f8af5fdbb7d07d0fbe98cd29f165',1,'m5::unit::UnitATECC608B']]]
 ];

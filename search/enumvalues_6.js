@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['primaryprivatekey_0',['PrimaryPrivateKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a1b90159f5506f276a5f5f2092ca72acf',1,'m5::unit::atecc608']]]
+  ['internalsignprivatekey_0',['InternalSignPrivateKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a3205ee06dc588f7c1e7a2cfe1d063c86',1,'m5::unit::atecc608']]],
+  ['ioprotectionkey_1',['IOProtectionKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a746342b8abf188977ed7616e8f8a47c7',1,'m5::unit::atecc608']]]
 ];

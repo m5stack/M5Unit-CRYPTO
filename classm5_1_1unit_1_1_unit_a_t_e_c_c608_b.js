@@ -1,7 +1,8 @@
 var classm5_1_1unit_1_1_unit_a_t_e_c_c608_b =
 [
     [ "config_t", "structm5_1_1unit_1_1_unit_a_t_e_c_c608_b_1_1config__t.html", "structm5_1_1unit_1_1_unit_a_t_e_c_c608_b_1_1config__t" ],
-    [ "config", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a4f10919e6c7f93ba21700156a5105381", null ],
+    [ "begin", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#accb9f8af5fdbb7d07d0fbe98cd29f165", null ],
+    [ "config", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a0805fbf184fb59f646c3f61247bed9f1", null ],
     [ "config", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a9c7482fe30614fd53241fcc2f3df2737", null ],
     [ "createNonce", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ab845e304d8703bd6c8c4868b6d829794", null ],
     [ "ECDHStoredKey", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a04e865fb0dd1f8719e6af640e7cbef51", null ],
@@ -23,6 +24,7 @@ var classm5_1_1unit_1_1_unit_a_t_e_c_c608_b =
     [ "readCounter", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ad6dc6b93ad6eaa671820d0d524a213b4", null ],
     [ "readDataZone", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a801094790b3b476d38acc3878656172b", null ],
     [ "readDeviceState", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#aaf93d63bdcee646f06cd5227af4dedc1", null ],
+    [ "readGeneralData", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a4785e12c24164efe032c91ef21c609ee", null ],
     [ "readKeyConfig", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a57e28d204cf425cd1dba8e22e80de45c", null ],
     [ "readKeyValid", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5ecf9f7e35d4065a9615d7015263521e", null ],
     [ "readOTPZone", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a2e928c1079eaeda8b891f3d4fc3d36c4", null ],
@@ -38,7 +40,7 @@ var classm5_1_1unit_1_1_unit_a_t_e_c_c608_b =
     [ "readSlotLocked", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ac7783ecc9e44f45b0ca51ccb2ab65a06", null ],
     [ "readZoneLocked", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a84f4276069fe702b35f8bf875dc5d84b", null ],
     [ "revision", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ac008193aca49632fb5556e8e456758ea", null ],
-    [ "selfTest", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ab3df2b2400ca7f57842b6b7eb398f0c9", null ],
+    [ "selfTest", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a6f00cbf902792e2b0e4973c64ff527da", null ],
     [ "SHA256", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a91fd53f58eba5db57d2f11fc9ee56582", null ],
     [ "signExternal", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#afa5b13a8e45f007d3affb2fb06f8033c", null ],
     [ "signInternal", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a8ed24ac0597b329de3d8d392e65917c1", null ],
@@ -48,6 +50,7 @@ var classm5_1_1unit_1_1_unit_a_t_e_c_c608_b =
     [ "verifyExternal", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#af4b77a7e5e763fb69ad89568163ecf7d", null ],
     [ "verifyStored", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#ac948ce12620722c3aa7f5af3726325b5", null ],
     [ "wakeup", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5d8dfbfa411735a187909d1f124d0c81", null ],
+    [ "writeGeneralData", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a5d9cee37c073bd01ee46787497041285", null ],
     [ "writeNonce32", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a30b3134e3cfc28a68e2d7b21b1e9b4c9", null ],
     [ "writeNonce64", "classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a59e94a184db7de738e751da4c07d74df", null ]
 ];

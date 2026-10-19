@@ -27,7 +27,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">M5Unit-CRYPTO<span id="projectnumber">&#160;0.1.0 git rev:99e558e</span>
+   <div id="projectname">M5Unit-CRYPTO<span id="projectnumber">&#160;0.3.0 git rev:8d14de1</span>
    </div>
   </td>
  </tr>
@@ -115,8 +115,10 @@ $(function(){initNavTree('atecc608_8hpp.html',''); initResizable(true); });
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html">m5::unit::atecc608::CompCertAccessor</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compressed certificate accessor.  <a href="classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html">m5::unit::atecc608::CompCertAccessor::DateTime</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Date and time (same members as struct tm)  <a href="structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="namespaces" name="namespaces"></a>
@@ -132,6 +134,7 @@ Namespaces</h2></td></tr>
 Typedefs</h2></td></tr>
 <tr class="memitem:ab4534b425bd46c35acc5afce1442514c" id="r_ab4534b425bd46c35acc5afce1442514c"><td class="memItemLeft" align="right" valign="top"><a id="ab4534b425bd46c35acc5afce1442514c" name="ab4534b425bd46c35acc5afce1442514c"></a>
 using&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::Destination</b> = <a class="el" href="#a024323b4632b119a89ac5252b27e8e19">Source</a></td></tr>
+<tr class="memdesc:ab4534b425bd46c35acc5afce1442514c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Data destination (same values as Source) <br /></td></tr>
 <tr class="separator:ab4534b425bd46c35acc5afce1442514c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="enum-members" name="enum-members"></a>
@@ -153,7 +156,7 @@ Enumerations</h2></td></tr>
 , <a class="el" href="#a056ea9efd6148442c4942edfe1b0b733a174222d2764241a9bf9e5c350c53ed33">SignerCompressedCertificate</a>
 <br />
  }</td></tr>
-<tr class="memdesc:a056ea9efd6148442c4942edfe1b0b733"><td class="mdescLeft">&#160;</td><td class="mdescRight">Slot configuration summay.  <a href="#a056ea9efd6148442c4942edfe1b0b733">More...</a><br /></td></tr>
+<tr class="memdesc:a056ea9efd6148442c4942edfe1b0b733"><td class="mdescLeft">&#160;</td><td class="mdescRight">Slot configuration summary.  <a href="#a056ea9efd6148442c4942edfe1b0b733">More...</a><br /></td></tr>
 <tr class="separator:a056ea9efd6148442c4942edfe1b0b733"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a024323b4632b119a89ac5252b27e8e19" id="r_a024323b4632b119a89ac5252b27e8e19"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a024323b4632b119a89ac5252b27e8e19">m5::unit::atecc608::Source</a> : uint8_t { <a class="el" href="#a024323b4632b119a89ac5252b27e8e19aa661ada445430cfd79adb873071898df">TempKey</a>
 , <a class="el" href="#a024323b4632b119a89ac5252b27e8e19aa4df4ea313d0b111bb4cdcaee2b813c7">MsgDigestBuffer</a>
@@ -162,21 +165,21 @@ Enumerations</h2></td></tr>
  }</td></tr>
 <tr class="memdesc:a024323b4632b119a89ac5252b27e8e19"><td class="mdescLeft">&#160;</td><td class="mdescRight">Data source.  <a href="#a024323b4632b119a89ac5252b27e8e19">More...</a><br /></td></tr>
 <tr class="separator:a024323b4632b119a89ac5252b27e8e19"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abd49d5d4ffa50931dfed4f02464e91a4" id="r_abd49d5d4ffa50931dfed4f02464e91a4"><td class="memItemLeft" align="right" valign="top"><a id="abd49d5d4ffa50931dfed4f02464e91a4" name="abd49d5d4ffa50931dfed4f02464e91a4"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4">m5::unit::atecc608::Error</a> : uint8_t { <br />
-&#160;&#160;<b>CHECK_MAC_OR_VERIFY_ERROR</b> = 0x01
-, <b>PARSE_ERROR</b> = 0x03
-, <b>ECC_FAULT</b> = 0x05
-, <b>SELF_TEST_ERROR</b> = 0x07
+<tr class="memitem:abd49d5d4ffa50931dfed4f02464e91a4" id="r_abd49d5d4ffa50931dfed4f02464e91a4"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4">m5::unit::atecc608::Error</a> : uint8_t { <br />
+&#160;&#160;<a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4a6693b5a8da30a708835ce8fa16a1bb41">m5::unit::atecc608::CHECK_MAC_OR_VERIFY_ERROR</a> = 0x01
+, <a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4a72c6b86560bf298c1c852c39eebf0756">m5::unit::atecc608::PARSE_ERROR</a> = 0x03
+, <a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4ae5103f32ab58bc4f8e579a891029ed8e">m5::unit::atecc608::ECC_FAULT</a> = 0x05
+, <a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4a4e629d989692fccd6ab0403dc672183f">m5::unit::atecc608::SELF_TEST_ERROR</a> = 0x07
 , <br />
-&#160;&#160;<b>HEALTH_TEST_ERROR</b> = 0x08
-, <b>EXECUTION_ERROR</b> = 0x0F
-, <b>AFTER_WAKE_PRIOR_ERROR</b> = 0X11
-, <b>WATCH_DOG_ERROR</b> = 0xEE
+&#160;&#160;<a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4ad43f09e28d92fe3a5c3984bf5c126133">m5::unit::atecc608::HEALTH_TEST_ERROR</a> = 0x08
+, <a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4aea0ccdcb35ad5fd3dd7aa8a2888ec54e">m5::unit::atecc608::EXECUTION_ERROR</a> = 0x0F
+, <a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4a250f01d5e072c093c071166a70c7c670">m5::unit::atecc608::AFTER_WAKE_PRIOR_ERROR</a> = 0x11
+, <a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4a9708554d3133c6b1306bb2bd3df5e905">m5::unit::atecc608::WATCH_DOG_ERROR</a> = 0xEE
 , <br />
-&#160;&#160;<b>CRC_OR_COMMUNICATION_ERROR</b> = 0XFF
+&#160;&#160;<a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4ac6c34b031d1ed0025c7e9093b0cd787e">m5::unit::atecc608::CRC_OR_COMMUNICATION_ERROR</a> = 0xFF
 <br />
  }</td></tr>
-<tr class="memdesc:abd49d5d4ffa50931dfed4f02464e91a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Error status. <br /></td></tr>
+<tr class="memdesc:abd49d5d4ffa50931dfed4f02464e91a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Error status.  <a href="#abd49d5d4ffa50931dfed4f02464e91a4">More...</a><br /></td></tr>
 <tr class="separator:abd49d5d4ffa50931dfed4f02464e91a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
@@ -185,10 +188,10 @@ Functions</h2></td></tr>
 uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::offset_to_param2_for_config</b> (const uint8_t offset)</td></tr>
 <tr class="memdesc:aba01731899c8a5d4feaf127f8168203f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Conversion offset to address for Config,OTP zone. <br /></td></tr>
 <tr class="separator:aba01731899c8a5d4feaf127f8168203f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9b14f3df0d8153f7b0e33f18b445a6aa" id="r_a9b14f3df0d8153f7b0e33f18b445a6aa"><td class="memItemLeft" align="right" valign="top"><a id="a9b14f3df0d8153f7b0e33f18b445a6aa" name="a9b14f3df0d8153f7b0e33f18b445a6aa"></a>
-uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::slot_block_to_param2</b> (const uint8_t slot, const uint8_t offset)</td></tr>
-<tr class="memdesc:a9b14f3df0d8153f7b0e33f18b445a6aa"><td class="mdescLeft">&#160;</td><td class="mdescRight">Conversion slot and block to address for Data zone. <br /></td></tr>
-<tr class="separator:a9b14f3df0d8153f7b0e33f18b445a6aa"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a187453b73a7c93175199238cc20fa1cd" id="r_a187453b73a7c93175199238cc20fa1cd"><td class="memItemLeft" align="right" valign="top"><a id="a187453b73a7c93175199238cc20fa1cd" name="a187453b73a7c93175199238cc20fa1cd"></a>
+uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::slot_block_to_param2</b> (const uint8_t slot, const uint16_t offset)</td></tr>
+<tr class="memdesc:a187453b73a7c93175199238cc20fa1cd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Conversion slot and block to address for Data zone. <br /></td></tr>
+<tr class="separator:a187453b73a7c93175199238cc20fa1cd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa874048a8a3d6e05642f7e5d2f820cd0" id="r_aa874048a8a3d6e05642f7e5d2f820cd0"><td class="memItemLeft" align="right" valign="top"><a id="aa874048a8a3d6e05642f7e5d2f820cd0" name="aa874048a8a3d6e05642f7e5d2f820cd0"></a>
 constexpr uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::encoded_base64_length</b> (const uint32_t ilen)</td></tr>
 <tr class="memdesc:aa874048a8a3d6e05642f7e5d2f820cd0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Calculate encoded size (no line break) <br /></td></tr>
@@ -203,17 +206,64 @@ Variables</h2></td></tr>
 <tr><td colspan="2"><div class="groupHeader">Zone</div></td></tr>
 <tr class="memitem:a864dc77ba530efc8d70fc7544c3c2c68" id="r_a864dc77ba530efc8d70fc7544c3c2c68"><td class="memItemLeft" align="right" valign="top"><a id="a864dc77ba530efc8d70fc7544c3c2c68" name="a864dc77ba530efc8d70fc7544c3c2c68"></a>
 constexpr uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::ZONE_CONFIG</b> {0x00}</td></tr>
+<tr class="memdesc:a864dc77ba530efc8d70fc7544c3c2c68"><td class="mdescLeft">&#160;</td><td class="mdescRight">Configuration zone. <br /></td></tr>
 <tr class="separator:a864dc77ba530efc8d70fc7544c3c2c68"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a97964d358dffb16f12e0ee498e554674" id="r_a97964d358dffb16f12e0ee498e554674"><td class="memItemLeft" align="right" valign="top"><a id="a97964d358dffb16f12e0ee498e554674" name="a97964d358dffb16f12e0ee498e554674"></a>
 constexpr uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::ZONE_OTP</b> {0x01}</td></tr>
+<tr class="memdesc:a97964d358dffb16f12e0ee498e554674"><td class="mdescLeft">&#160;</td><td class="mdescRight">One time programmable zone. <br /></td></tr>
 <tr class="separator:a97964d358dffb16f12e0ee498e554674"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abb7e4553e0dc91c1f6ab57703cc9e468" id="r_abb7e4553e0dc91c1f6ab57703cc9e468"><td class="memItemLeft" align="right" valign="top"><a id="abb7e4553e0dc91c1f6ab57703cc9e468" name="abb7e4553e0dc91c1f6ab57703cc9e468"></a>
 constexpr uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::ZONE_DATA</b> {0x02}</td></tr>
+<tr class="memdesc:abb7e4553e0dc91c1f6ab57703cc9e468"><td class="mdescLeft">&#160;</td><td class="mdescRight">Data zone. <br /></td></tr>
 <tr class="separator:abb7e4553e0dc91c1f6ab57703cc9e468"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr><td colspan="2"><div class="groupHeader">Certificate size</div></td></tr>
+<tr class="memitem:a2c388467f1c3ce6be4a1dcac9ca580a2" id="r_a2c388467f1c3ce6be4a1dcac9ca580a2"><td class="memItemLeft" align="right" valign="top">constexpr uint16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a2c388467f1c3ce6be4a1dcac9ca580a2">m5::unit::atecc608::MAX_DEVICE_CERTIFICATE_SIZE</a> {548}</td></tr>
+<tr class="memdesc:a2c388467f1c3ce6be4a1dcac9ca580a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Device certificate (template 546 + 2)  <br /></td></tr>
+<tr class="separator:a2c388467f1c3ce6be4a1dcac9ca580a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a848a0ca8921e9d8f22f575d69152cf87" id="r_a848a0ca8921e9d8f22f575d69152cf87"><td class="memItemLeft" align="right" valign="top"><a id="a848a0ca8921e9d8f22f575d69152cf87" name="a848a0ca8921e9d8f22f575d69152cf87"></a>
+constexpr uint16_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit::atecc608::MAX_SIGNER_CERTIFICATE_SIZE</b> {521}</td></tr>
+<tr class="memdesc:a848a0ca8921e9d8f22f575d69152cf87"><td class="mdescLeft">&#160;</td><td class="mdescRight">Signer certificate (template 520 + 1) <br /></td></tr>
+<tr class="separator:a848a0ca8921e9d8f22f575d69152cf87"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>ATECC608 definition. </p>
 </div><h2 class="groupheader">Enumeration Type Documentation</h2>
+<a id="abd49d5d4ffa50931dfed4f02464e91a4" name="abd49d5d4ffa50931dfed4f02464e91a4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abd49d5d4ffa50931dfed4f02464e91a4">&#9670;&#160;</a></span>Error</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="#abd49d5d4ffa50931dfed4f02464e91a4">m5::unit::atecc608::Error</a> : uint8_t</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Error status. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4a6693b5a8da30a708835ce8fa16a1bb41" name="abd49d5d4ffa50931dfed4f02464e91a4a6693b5a8da30a708835ce8fa16a1bb41"></a>CHECK_MAC_OR_VERIFY_ERROR&#160;</td><td class="fielddoc"><p>CheckMac or Verify miscompare. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4a72c6b86560bf298c1c852c39eebf0756" name="abd49d5d4ffa50931dfed4f02464e91a4a72c6b86560bf298c1c852c39eebf0756"></a>PARSE_ERROR&#160;</td><td class="fielddoc"><p>Illegal parameter or command. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4ae5103f32ab58bc4f8e579a891029ed8e" name="abd49d5d4ffa50931dfed4f02464e91a4ae5103f32ab58bc4f8e579a891029ed8e"></a>ECC_FAULT&#160;</td><td class="fielddoc"><p>ECC processing fault. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4a4e629d989692fccd6ab0403dc672183f" name="abd49d5d4ffa50931dfed4f02464e91a4a4e629d989692fccd6ab0403dc672183f"></a>SELF_TEST_ERROR&#160;</td><td class="fielddoc"><p>Self test failure. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4ad43f09e28d92fe3a5c3984bf5c126133" name="abd49d5d4ffa50931dfed4f02464e91a4ad43f09e28d92fe3a5c3984bf5c126133"></a>HEALTH_TEST_ERROR&#160;</td><td class="fielddoc"><p>Random number generator health test failure. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4aea0ccdcb35ad5fd3dd7aa8a2888ec54e" name="abd49d5d4ffa50931dfed4f02464e91a4aea0ccdcb35ad5fd3dd7aa8a2888ec54e"></a>EXECUTION_ERROR&#160;</td><td class="fielddoc"><p>Command could not be executed. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4a250f01d5e072c093c071166a70c7c670" name="abd49d5d4ffa50931dfed4f02464e91a4a250f01d5e072c093c071166a70c7c670"></a>AFTER_WAKE_PRIOR_ERROR&#160;</td><td class="fielddoc"><p>After wake, prior to first command. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4a9708554d3133c6b1306bb2bd3df5e905" name="abd49d5d4ffa50931dfed4f02464e91a4a9708554d3133c6b1306bb2bd3df5e905"></a>WATCH_DOG_ERROR&#160;</td><td class="fielddoc"><p>Watchdog is about to expire. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abd49d5d4ffa50931dfed4f02464e91a4ac6c34b031d1ed0025c7e9093b0cd787e" name="abd49d5d4ffa50931dfed4f02464e91a4ac6c34b031d1ed0025c7e9093b0cd787e"></a>CRC_OR_COMMUNICATION_ERROR&#160;</td><td class="fielddoc"><p>CRC or communication error. </p>
+</td></tr>
+</table>
+
+</div>
+</div>
 <a id="a056ea9efd6148442c4942edfe1b0b733" name="a056ea9efd6148442c4942edfe1b0b733"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a056ea9efd6148442c4942edfe1b0b733">&#9670;&#160;</a></span>Slot</h2>
 
@@ -234,7 +284,7 @@ constexpr uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit
 </table>
 </div><div class="memdoc">
 
-<p>Slot configuration summay. </p>
+<p>Slot configuration summary. </p>
 <table class="fieldtable">
 <tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a056ea9efd6148442c4942edfe1b0b733a1b90159f5506f276a5f5f2092ca72acf" name="a056ea9efd6148442c4942edfe1b0b733a1b90159f5506f276a5f5f2092ca72acf"></a>PrimaryPrivateKey&#160;</td><td class="fielddoc"><p>Primary authentication key. </p>
 </td></tr>
@@ -295,6 +345,32 @@ constexpr uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>m5::unit
 <tr><td class="fieldname"><a id="a024323b4632b119a89ac5252b27e8e19a3a6ecebdb9754637d24b3a978b0c628f" name="a024323b4632b119a89ac5252b27e8e19a3a6ecebdb9754637d24b3a978b0c628f"></a>ExternalBuffer&#160;</td><td class="fielddoc"><p>Any buffer. </p>
 </td></tr>
 </table>
+
+</div>
+</div>
+<h2 class="groupheader">Variable Documentation</h2>
+<a id="a2c388467f1c3ce6be4a1dcac9ca580a2" name="a2c388467f1c3ce6be4a1dcac9ca580a2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2c388467f1c3ce6be4a1dcac9ca580a2">&#9670;&#160;</a></span>MAX_DEVICE_CERTIFICATE_SIZE</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint16_t m5::unit::atecc608::MAX_DEVICE_CERTIFICATE_SIZE {548}</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Device certificate (template 546 + 2) </p>
+<p>The DER signature at the end of a certificate is at most 75 bytes long (each INTEGER gets a leading 0x00 when its MSB is 1), so a certificate can be longer than its template. Give an output buffer of at least these sizes </p>
 
 </div>
 </div>

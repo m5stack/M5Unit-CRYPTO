@@ -1,4 +1,23 @@
 var searchData=
 [
-  ['tempkey_0',['TempKey',['../atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19aa661ada445430cfd79adb873071898df',1,'m5::unit::atecc608']]]
+  ['secondaryprivatekey1_0',['SecondaryPrivateKey1',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a0ac49ca60a890a1405692440b692c692',1,'m5::unit::atecc608']]],
+  ['secondaryprivatekey2_1',['SecondaryPrivateKey2',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a8d784a6f82f568a61789abc694b18661',1,'m5::unit::atecc608']]],
+  ['secondaryprivatekey3_2',['SecondaryPrivateKey3',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a51e1631cfb3ba3838eae15d72e2322d1',1,'m5::unit::atecc608']]],
+  ['self_5ftest_5ferror_3',['SELF_TEST_ERROR',['../atecc608_8hpp.html#abd49d5d4ffa50931dfed4f02464e91a4a4e629d989692fccd6ab0403dc672183f',1,'m5::unit::atecc608']]],
+  ['selftest_4',['selfTest',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a6f00cbf902792e2b0e4973c64ff527da',1,'m5::unit::UnitATECC608B']]],
+  ['sha256_5',['SHA256',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a91fd53f58eba5db57d2f11fc9ee56582',1,'m5::unit::UnitATECC608B']]],
+  ['signature_6',['signature',['../classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html#a92df055476309b9217ce89e73e35f1e8',1,'m5::unit::atecc608::CompCertAccessor']]],
+  ['signature_5fr_7',['signature_r',['../classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html#aa1e4076f0890989445c329f4cbd7a1e3',1,'m5::unit::atecc608::CompCertAccessor']]],
+  ['signature_5fs_8',['signature_s',['../classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html#a7369b389cca25962532d1fee6060bb18',1,'m5::unit::atecc608::CompCertAccessor']]],
+  ['signer_5fid_9',['signer_id',['../classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html#ab665cc0c8e7391560b6b928ec3122552',1,'m5::unit::atecc608::CompCertAccessor']]],
+  ['signercompressedcertificate_10',['SignerCompressedCertificate',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a174222d2764241a9bf9e5c350c53ed33',1,'m5::unit::atecc608']]],
+  ['signerpublickey_11',['SignerPublicKey',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a2ba4b562881032ddc06d174f108c1da1',1,'m5::unit::atecc608']]],
+  ['signexternal_12',['signExternal',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#afa5b13a8e45f007d3affb2fb06f8033c',1,'m5::unit::UnitATECC608B']]],
+  ['signinternal_13',['signInternal',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a8ed24ac0597b329de3d8d392e65917c1',1,'m5::unit::UnitATECC608B']]],
+  ['sleep_14',['sleep',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#a9041876a4dcbd675da0aab31e37d6c2b',1,'m5::unit::UnitATECC608B']]],
+  ['slot_15',['Slot',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733',1,'m5::unit::atecc608']]],
+  ['slot_5fblock_5fto_5fparam2_16',['slot_block_to_param2',['../atecc608_8hpp.html#a187453b73a7c93175199238cc20fa1cd',1,'m5::unit::atecc608']]],
+  ['sn_5fsource_17',['sn_source',['../classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.html#aabad6fd6bf33cfa0cb75be78b02c2edd',1,'m5::unit::atecc608::CompCertAccessor']]],
+  ['source_18',['Source',['../atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19',1,'m5::unit::atecc608']]],
+  ['startsha256_19',['startSHA256',['../classm5_1_1unit_1_1_unit_a_t_e_c_c608_b.html#af21150e6049ff9c660033835e859eb74',1,'m5::unit::UnitATECC608B']]]
 ];

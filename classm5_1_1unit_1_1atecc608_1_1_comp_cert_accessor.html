@@ -27,7 +27,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">M5Unit-CRYPTO<span id="projectnumber">&#160;0.1.0 git rev:99e558e</span>
+   <div id="projectname">M5Unit-CRYPTO<span id="projectnumber">&#160;0.3.0 git rev:8d14de1</span>
    </div>
   </td>
  </tr>
@@ -103,49 +103,68 @@ $(function(){initNavTree('classm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor.htm
   <div class="headertitle"><div class="title">m5::unit::atecc608::CompCertAccessor Class Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Compressed certificate accessor.  
+ <a href="#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="atecc608_8hpp_source.html">atecc608.hpp</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html">DateTime</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Date and time (same members as struct tm)  <a href="structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a3aac21c8c45dc457502f46497bca98ff" id="r_a3aac21c8c45dc457502f46497bca98ff"><td class="memItemLeft" align="right" valign="top"><a id="a3aac21c8c45dc457502f46497bca98ff" name="a3aac21c8c45dc457502f46497bca98ff"></a>
 &#160;</td><td class="memItemRight" valign="bottom"><b>CompCertAccessor</b> (const uint8_t *data)</td></tr>
+<tr class="memdesc:a3aac21c8c45dc457502f46497bca98ff"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructor (data: 72-byte compressed certificate) <br /></td></tr>
 <tr class="separator:a3aac21c8c45dc457502f46497bca98ff"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6668d799de65711a0be07ea672d9e3ba" id="r_a6668d799de65711a0be07ea672d9e3ba"><td class="memItemLeft" align="right" valign="top"><a id="a6668d799de65711a0be07ea672d9e3ba" name="a6668d799de65711a0be07ea672d9e3ba"></a>
 uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>format_version</b> () const</td></tr>
+<tr class="memdesc:a6668d799de65711a0be07ea672d9e3ba"><td class="mdescLeft">&#160;</td><td class="mdescRight">Format version. <br /></td></tr>
 <tr class="separator:a6668d799de65711a0be07ea672d9e3ba"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a161436aec793ef1b63f1f5826e29b4ac" id="r_a161436aec793ef1b63f1f5826e29b4ac"><td class="memItemLeft" align="right" valign="top"><a id="a161436aec793ef1b63f1f5826e29b4ac" name="a161436aec793ef1b63f1f5826e29b4ac"></a>
 uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>template_id</b> () const</td></tr>
+<tr class="memdesc:a161436aec793ef1b63f1f5826e29b4ac"><td class="mdescLeft">&#160;</td><td class="mdescRight">Template ID. <br /></td></tr>
 <tr class="separator:a161436aec793ef1b63f1f5826e29b4ac"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3c4c71288a1f1d3ca715f5a892409cf2" id="r_a3c4c71288a1f1d3ca715f5a892409cf2"><td class="memItemLeft" align="right" valign="top"><a id="a3c4c71288a1f1d3ca715f5a892409cf2" name="a3c4c71288a1f1d3ca715f5a892409cf2"></a>
 uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>chain_id</b> () const</td></tr>
+<tr class="memdesc:a3c4c71288a1f1d3ca715f5a892409cf2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Chain ID. <br /></td></tr>
 <tr class="separator:a3c4c71288a1f1d3ca715f5a892409cf2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aabad6fd6bf33cfa0cb75be78b02c2edd" id="r_aabad6fd6bf33cfa0cb75be78b02c2edd"><td class="memItemLeft" align="right" valign="top"><a id="aabad6fd6bf33cfa0cb75be78b02c2edd" name="aabad6fd6bf33cfa0cb75be78b02c2edd"></a>
 uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>sn_source</b> () const</td></tr>
+<tr class="memdesc:aabad6fd6bf33cfa0cb75be78b02c2edd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Serial number source. <br /></td></tr>
 <tr class="separator:aabad6fd6bf33cfa0cb75be78b02c2edd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab665cc0c8e7391560b6b928ec3122552" id="r_ab665cc0c8e7391560b6b928ec3122552"><td class="memItemLeft" align="right" valign="top"><a id="ab665cc0c8e7391560b6b928ec3122552" name="ab665cc0c8e7391560b6b928ec3122552"></a>
 const uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><b>signer_id</b> () const</td></tr>
+<tr class="memdesc:ab665cc0c8e7391560b6b928ec3122552"><td class="mdescLeft">&#160;</td><td class="mdescRight">Signer ID (2 bytes) <br /></td></tr>
 <tr class="separator:ab665cc0c8e7391560b6b928ec3122552"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a92df055476309b9217ce89e73e35f1e8" id="r_a92df055476309b9217ce89e73e35f1e8"><td class="memItemLeft" align="right" valign="top"><a id="a92df055476309b9217ce89e73e35f1e8" name="a92df055476309b9217ce89e73e35f1e8"></a>
 const uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><b>signature</b> () const</td></tr>
+<tr class="memdesc:a92df055476309b9217ce89e73e35f1e8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Signature (R and S, 64 bytes) <br /></td></tr>
 <tr class="separator:a92df055476309b9217ce89e73e35f1e8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa1e4076f0890989445c329f4cbd7a1e3" id="r_aa1e4076f0890989445c329f4cbd7a1e3"><td class="memItemLeft" align="right" valign="top"><a id="aa1e4076f0890989445c329f4cbd7a1e3" name="aa1e4076f0890989445c329f4cbd7a1e3"></a>
 const uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><b>signature_r</b> () const</td></tr>
+<tr class="memdesc:aa1e4076f0890989445c329f4cbd7a1e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Signature R (32 bytes) <br /></td></tr>
 <tr class="separator:aa1e4076f0890989445c329f4cbd7a1e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7369b389cca25962532d1fee6060bb18" id="r_a7369b389cca25962532d1fee6060bb18"><td class="memItemLeft" align="right" valign="top"><a id="a7369b389cca25962532d1fee6060bb18" name="a7369b389cca25962532d1fee6060bb18"></a>
 const uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><b>signature_s</b> () const</td></tr>
+<tr class="memdesc:a7369b389cca25962532d1fee6060bb18"><td class="mdescLeft">&#160;</td><td class="mdescRight">Signature S (32 bytes) <br /></td></tr>
 <tr class="separator:a7369b389cca25962532d1fee6060bb18"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a230a477f7b0c140c1bb6a50f1e631066" id="r_a230a477f7b0c140c1bb6a50f1e631066"><td class="memItemLeft" align="right" valign="top"><a id="a230a477f7b0c140c1bb6a50f1e631066" name="a230a477f7b0c140c1bb6a50f1e631066"></a>
 <a class="el" href="structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html">DateTime</a>&#160;</td><td class="memItemRight" valign="bottom"><b>issue_date</b> () const</td></tr>
+<tr class="memdesc:a230a477f7b0c140c1bb6a50f1e631066"><td class="mdescLeft">&#160;</td><td class="mdescRight">Issue date. <br /></td></tr>
 <tr class="separator:a230a477f7b0c140c1bb6a50f1e631066"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4d77456428bf8d8be7eaa7abe549381e" id="r_a4d77456428bf8d8be7eaa7abe549381e"><td class="memItemLeft" align="right" valign="top"><a id="a4d77456428bf8d8be7eaa7abe549381e" name="a4d77456428bf8d8be7eaa7abe549381e"></a>
 <a class="el" href="structm5_1_1unit_1_1atecc608_1_1_comp_cert_accessor_1_1_date_time.html">DateTime</a>&#160;</td><td class="memItemRight" valign="bottom"><b>expire_date</b> () const</td></tr>
+<tr class="memdesc:a4d77456428bf8d8be7eaa7abe549381e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Expire date (9999-12-31 23:59:59 if it does not expire) <br /></td></tr>
 <tr class="separator:a4d77456428bf8d8be7eaa7abe549381e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-</div><!-- contents -->
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Compressed certificate accessor. </p>
+</div></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->

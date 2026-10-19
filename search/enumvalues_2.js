@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['externalbuffer_0',['ExternalBuffer',['../atecc608_8hpp.html#a024323b4632b119a89ac5252b27e8e19a3a6ecebdb9754637d24b3a978b0c628f',1,'m5::unit::atecc608']]]
+  ['devicecompressedcertificate_0',['DeviceCompressedCertificate',['../atecc608_8hpp.html#a056ea9efd6148442c4942edfe1b0b733a64cea2e87e2740f41f930b0341249353',1,'m5::unit::atecc608']]]
 ];
