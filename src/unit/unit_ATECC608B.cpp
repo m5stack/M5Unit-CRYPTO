@@ -9,8 +9,9 @@
 */
 #include "unit_ATECC608B.hpp"
 #include <M5Utility.hpp>
-#if defined(ARDUINO)
 #include <driver/gpio.h>
+#if defined(ARDUINO)
+#include <Wire.h>
 #endif
 
 using namespace m5::utility::mmh3;
@@ -31,6 +32,12 @@ constexpr uint8_t sign_source_table[] = {SIGN_MODE_TEMPKEY, SIGN_MODE_DIGEST, 0x
 
 constexpr uint8_t verify_source_table[] = {SIGN_MODE_TEMPKEY, SIGN_MODE_DIGEST, 0xFF, 0xFF};
 
+// GenKey OtherData (3 bytes) when the caller gives none
+constexpr uint8_t ZERO_OTHER_DATA[3]{};
+
+// Interval of the idle -> wakeup transition in updateSHA256 (shorter than tWATCHDOG min 0.7 s)
+constexpr m5::utility::elapsed_time_t IDLE_WAKEUP_INTERVAL_MS{500};
+
 // CRC16
 m5::utility::CRC16 crc16(0x0000, 0x8005, true, false, 0x0000);
 
@@ -38,6 +45,17 @@ inline bool delay_true(const uint32_t ms = 1)
 {
     m5::utility::delay(ms);
     return true;  // Always!
+}
+
+// Hold SDA low for tWLO to wake the device (SDA must already be an open-drain GPIO output)
+void drive_wake_pulse(const gpio_num_t sda)
+{
+    gpio_set_level(sda, 1);
+    m5::utility::delayMicroseconds(5);
+    gpio_set_level(sda, 0);
+    m5::utility::delayMicroseconds(80);  // tWLO >= 60us
+    gpio_set_level(sda, 1);
+    m5::utility::delayMicroseconds(5);
 }
 
 }  // namespace
@@ -52,10 +70,12 @@ const types::attr_t UnitATECC608B::attr{attribute::AccessI2C};
 
 bool UnitATECC608B::begin()
 {
-    // The Verify(External) command sends up to 163 bytes in a single I2C write transaction
-    // (8-byte header + up to 155 bytes data: 64-byte signature + 64-byte pubKey + ...).
+    // A command is sent in a single I2C write transaction of up to 156 bytes
+    // (word address, count, opcode, param1, param2, up to 148 bytes data and CRC).
+    // Verify(External) sends 136 bytes (64-byte signature + 64-byte pubKey).
     // Arduino Wire's default TX buffer is 128 bytes, which silently truncates larger writes,
     // causing CRC mismatch and device timeout.  Expand the buffer when using Arduino Wire.
+#if defined(ARDUINO)
     auto ad = asAdapter<AdapterI2C>(Adapter::Type::I2C);
     if (ad && ad->implType() == AdapterI2C::ImplType::TwoWire) {
         constexpr size_t REQUIRED_BUF_SIZE{256};
@@ -65,6 +85,7 @@ bool UnitATECC608B::begin()
             M5_LIB_LOGI("Wire TX buffer expanded to %u", REQUIRED_BUF_SIZE);
         }
     }
+#endif
 
     if (!wakeup()) {
         M5_LIB_LOGE("Failed to wakeup");
@@ -89,11 +110,13 @@ bool UnitATECC608B::begin()
         return false;
     }
 
-    // End the session
-    if (!_cfg.idle) {
-        return sleep();
+    // End the session (the result does not affect begin)
+    if (_cfg.idle) {
+        idle();
+    } else {
+        sleep();
     }
-    return idle();
+    return true;
 }
 
 bool UnitATECC608B::begin_impl()
@@ -116,7 +139,7 @@ bool UnitATECC608B::wakeup()
 
     auto sda_pin = ad->sda();
     auto scl_pin = ad->scl();
-    if (sda_pin < 0 && scl_pin < 0) {
+    if (sda_pin < 0 || scl_pin < 0) {
         M5_LIB_LOGE("Invalid pin %d,%d", sda_pin, scl_pin);
         return false;
     }
@@ -126,22 +149,18 @@ bool UnitATECC608B::wakeup()
     for (uint_fast8_t retry = 0; retry < 3; ++retry) {
         // GPIO SDA pulse wakeup (no general call — avoids affecting other devices)
         m5::utility::delay(1);
+        selectChannel(channel());  // Route the SDA wake pulse through PaHub to this unit's channel
 
-        gpio::pin_backup_t sda_backup(sda_pin);
-        gpio::pin_backup_t scl_backup(scl_pin);
-        gpio_set_direction((gpio_num_t)scl_pin, GPIO_MODE_OUTPUT_OD);
-        gpio_set_direction((gpio_num_t)sda_pin, GPIO_MODE_OUTPUT_OD);
-        gpio_set_level((gpio_num_t)scl_pin, 1);
-
-        gpio_set_level((gpio_num_t)sda_pin, 1);
-        m5::utility::delayMicroseconds(5);
-        gpio_set_level((gpio_num_t)sda_pin, 0);
-        m5::utility::delayMicroseconds(80);  // tWLO >= 60us
-        gpio_set_level((gpio_num_t)sda_pin, 1);
-        m5::utility::delayMicroseconds(5);
-
-        scl_backup.restore();
-        sda_backup.restore();
+        // The I2C controller sees an idle bus while the pins are driven as GPIO
+        if (!ad->releasePins()) {
+            M5_LIB_LOGE("Failed to release pins %d,%d", sda_pin, scl_pin);
+            return false;
+        }
+        drive_wake_pulse((gpio_num_t)sda_pin);
+        if (!ad->restorePins()) {
+            M5_LIB_LOGE("Failed to restore pins %d,%d", sda_pin, scl_pin);
+            return false;
+        }
 
         m5::utility::delayMicroseconds(1500);  // tWHI >= 1.5ms
 
@@ -153,8 +172,9 @@ bool UnitATECC608B::wakeup()
         }
         M5_LIB_LOGW("Wakeup retry %u err:%d resp:%02X,%02X,%02X,%02X", retry, (int)err, response[0], response[1],
                     response[2], response[3]);
-        // Device may be awake with stale state — force sleep before retry
-        writeWithTransaction(&WORD_ADDRESS_VALUE_SLEEP, 1);
+        // Device may be awake with stale state — reset the I/O buffer before retry.
+        // Idle (not sleep) keeps TempKey and the SHA context that a previous command left for the next one
+        writeWithTransaction(&WORD_ADDRESS_VALUE_IDLE, 1);
         m5::utility::delay(2);
     }
     return ok;
@@ -162,14 +182,16 @@ bool UnitATECC608B::wakeup()
 
 bool UnitATECC608B::sleep()
 {
-    writeWithTransaction(&WORD_ADDRESS_VALUE_SLEEP, 1);
-    return delay_true();
+    const bool ok = (writeWithTransaction(&WORD_ADDRESS_VALUE_SLEEP, 1) == m5::hal::error::error_t::OK);
+    m5::utility::delay(1);
+    return ok;
 }
 
 bool UnitATECC608B::idle()
 {
-    writeWithTransaction(&WORD_ADDRESS_VALUE_IDLE, 1);
-    return delay_true();
+    const bool ok = (writeWithTransaction(&WORD_ADDRESS_VALUE_IDLE, 1) == m5::hal::error::error_t::OK);
+    m5::utility::delay(1);
+    return ok;
 }
 
 bool UnitATECC608B::readRevision(uint8_t data[4])
@@ -187,7 +209,8 @@ bool UnitATECC608B::readRevision(uint8_t data[4])
         m5::utility::delay(DELAY_INFO);
         ok = receive_response(data, 4);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readKeyValid(bool& valid, const atecc608::Slot slot)
@@ -204,7 +227,8 @@ bool UnitATECC608B::readKeyValid(bool& valid, const atecc608::Slot slot)
         ok    = receive_response(rbuf, sizeof(rbuf));
         valid = ok && (rbuf[0] & 1);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readDeviceState(uint16_t& state)
@@ -221,7 +245,8 @@ bool UnitATECC608B::readDeviceState(uint16_t& state)
         ok    = receive_response(rbuf, sizeof(rbuf));
         state = (rbuf[0] << 8) | (rbuf[1] << 0);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readRandomArray(uint8_t data[32], const bool updateSeed)
@@ -239,7 +264,8 @@ bool UnitATECC608B::readRandomArray(uint8_t data[32], const bool updateSeed)
         m5::utility::delay(DELAY_RANDOM);
         ok = receive_response(data, 32);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readSerialNumber(uint8_t sn[9])
@@ -262,7 +288,8 @@ bool UnitATECC608B::readSerialNumber(uint8_t sn[9])
         sn[8] = tmp[0];
     }
 
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readSerialNumber(char str[19])
@@ -289,7 +316,8 @@ bool UnitATECC608B::readZoneLocked(bool& configLocked, bool& dataLocked)
         configLocked = (rbuf[3] == 0x00);  // 87 LockConfig (Config zone)
         dataLocked   = (rbuf[2] == 0x00);  // 86 LockValue (Data zone)
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readSlotLocked(uint16_t& slotLockedBits)
@@ -302,9 +330,10 @@ bool UnitATECC608B::readSlotLocked(uint16_t& slotLockedBits)
     bool ok =
         wakeup() && read_data(rbuf, sizeof(rbuf), ZONE_CONFIG, offset_to_param2_for_config(SLOT_LOCKED_CONFIG_BASE));
     if (ok) {
-        slotLockedBits = (rbuf[0] | (rbuf[1] << 8)) ^ 0xFFFF;
+        slotLockedBits = m5::types::little_uint16_t(rbuf[0], rbuf[1]).get() ^ 0xFFFF;
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::readConfigZone(uint8_t config[128])
@@ -317,14 +346,15 @@ bool UnitATECC608B::readConfigZone(uint8_t config[128])
         return false;
     }
 
-    // With DirectTransport, 32-byte block reads work reliably (no bus recovery interference).
+    // Read in 32-byte blocks to keep the number of I2C transactions per wakeup small
     uint_fast16_t offset{};
     for (offset = 0; offset < 128; offset += 32) {
         if (!read_data(config + offset, 32, ZONE_CONFIG, offset_to_param2_for_config(offset))) {
             break;
         }
     }
-    return idle() && (offset == 128);
+    idle();
+    return offset == 128;
 }
 
 bool UnitATECC608B::readDataZone(uint8_t* data, const uint16_t len, const atecc608::Slot slot)
@@ -342,18 +372,25 @@ bool UnitATECC608B::readDataZone(uint8_t* data, const uint16_t len, const atecc6
     int32_t remaining = len;
 
     while (remaining > 0) {
-        uint8_t rlen    = (remaining >= BLOCK_SIZE) ? BLOCK_SIZE : WORD_SIZE;
-        uint16_t param2 = slot_block_to_param2(m5::stl::to_underlying(slot), offset);
-        if (!read_data(ptr, rlen, ZONE_DATA | ((rlen >= BLOCK_SIZE) ? 0x80 : 0x00), param2)) {
+        const uint8_t rlen    = (remaining >= BLOCK_SIZE) ? BLOCK_SIZE : WORD_SIZE;
+        const uint16_t param2 = slot_block_to_param2(m5::stl::to_underlying(slot), offset);
+        uint8_t tmp[WORD_SIZE]{};
+        uint8_t* dst = (remaining < rlen) ? tmp : ptr;  // The last word may be partial
+        if (!read_data(dst, rlen, ZONE_DATA | ((rlen >= BLOCK_SIZE) ? 0x80 : 0x00), param2)) {
             break;
         }
 
-        ptr += rlen;
+        const uint8_t copied = static_cast<uint8_t>(std::min<int32_t>(remaining, rlen));
+        if (dst == tmp) {
+            memcpy(ptr, tmp, copied);
+        }
+        ptr += copied;
         offset += rlen;
-        remaining -= rlen;
+        remaining -= copied;
     }
 
-    return idle() && (offset == len);
+    idle();
+    return remaining == 0;
 }
 
 bool UnitATECC608B::writeGeneralData(const uint8_t* data, const uint16_t len, const uint16_t offset)
@@ -410,7 +447,8 @@ bool UnitATECC608B::writeGeneralData(const uint8_t* data, const uint16_t len, co
         written += BLOCK_SIZE;
     }
 
-    return idle();
+    idle();
+    return true;
 }
 
 bool UnitATECC608B::readGeneralData(uint8_t* data, const uint16_t len, const uint16_t offset)
@@ -457,7 +495,8 @@ bool UnitATECC608B::readGeneralData(uint8_t* data, const uint16_t len, const uin
         read_sz += BLOCK_SIZE;
     }
 
-    return idle() && (read_sz == rlen);
+    idle();
+    return read_sz == rlen;
 }
 
 bool UnitATECC608B::readOTPZone(uint8_t otp[64])
@@ -477,34 +516,32 @@ bool UnitATECC608B::readOTPZone(uint8_t otp[64])
             break;
         }
     }
-    return idle() && (offset == 64);
+    idle();
+    return offset == 64;
 }
 
 bool UnitATECC608B::counter(uint32_t& value, const uint8_t counter, const uint8_t mode)
 {
     value = 0;
 
-    if (counter > 1 || !wakeup() || mode > 1) {
+    if (counter > 1 || mode > 1 || !wakeup()) {
         return false;
     }
 
     bool ok{};
     if (send_command(OPCODE_COUNTER, mode, counter)) {
-        m5::utility::delay(mode == 0 ? DELAY_READ : DELAY_COUNTER);
+        m5::utility::delay(DELAY_COUNTER);
         uint8_t buf[4]{};
         ok    = receive_response(buf, sizeof(buf));
-        value = ok ? (buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24)) : 0;
+        value = ok ? m5::types::little_uint32_t(buf[0], buf[1], buf[2], buf[3]).get() : 0;
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::selfTest(uint8_t& resultBits, const uint8_t testBits)
 {
     resultBits = 0xFF;
-    if (!testBits) {
-        M5_LIB_LOGE("testBits must be set any bits");
-        return false;
-    }
     if (!wakeup()) {
         return false;
     }
@@ -514,7 +551,8 @@ bool UnitATECC608B::selfTest(uint8_t& resultBits, const uint8_t testBits)
         m5::utility::delay(DELAY_SELFTEST);
         ok = receive_response(&resultBits, 1);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::createNonce(uint8_t output[32], const uint8_t input[20], const bool useRNG, const bool updateSeed)
@@ -536,7 +574,8 @@ bool UnitATECC608B::createNonce(uint8_t output[32], const uint8_t input[20], con
         m5::utility::delay(DELAY_NONCE);
         ok = receive_response(output ? output : buf, 32);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::write_nonce(const Destination dest, const uint8_t* input, const uint32_t ilen)
@@ -557,18 +596,20 @@ bool UnitATECC608B::write_nonce(const Destination dest, const uint8_t* input, co
         //     M5_LIB_LOGE("Error:%02X", result[0]);
         // }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::generateKey(uint8_t pubKey[64])
 {
-    uint8_t wbuf[3]{};
-    return pubKey && generate_key(pubKey, GENKEY_MODE_PRIVATE, 0xFFFF, wbuf, 3);
+    return pubKey && generate_key(pubKey, GENKEY_MODE_PRIVATE, 0xFFFF, ZERO_OTHER_DATA, sizeof(ZERO_OTHER_DATA));
 }
 
 bool UnitATECC608B::generatePublicKeyDigest(const atecc608::Slot slot, const uint8_t otherData[3])
 {
-    return generate_key(nullptr, GENKEY_MODE_PUBLIC_DIGEST, m5::stl::to_underlying(slot), otherData, otherData ? 3 : 0);
+    // Mode 0x10 always takes 3 bytes of OtherData
+    return generate_key(nullptr, GENKEY_MODE_PUBLIC_DIGEST, m5::stl::to_underlying(slot),
+                        otherData ? otherData : ZERO_OTHER_DATA, sizeof(ZERO_OTHER_DATA));
 }
 
 bool UnitATECC608B::generate_key(uint8_t pubKey[64], const uint8_t mode, const uint16_t param2, const uint8_t* data,
@@ -584,7 +625,8 @@ bool UnitATECC608B::generate_key(uint8_t pubKey[64], const uint8_t mode, const u
             ok = receive_response(&status, 1) && (status == 0);
         }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::sign(uint8_t signature[64], const uint8_t mode, const uint16_t param2, const atecc608::Source src)
@@ -601,7 +643,8 @@ bool UnitATECC608B::sign(uint8_t signature[64], const uint8_t mode, const uint16
         m5::utility::delay(DELAY_SIGN);
         ok = receive_response(signature, 64);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::startSHA256()
@@ -613,7 +656,8 @@ bool UnitATECC608B::startSHA256()
             m5::utility::delay(DELAY_SHA);
             ok = receive_response(&status, 1);
         }
-        return idle() && ok && status == 0;
+        idle();
+        return ok && status == 0;
     }
     return false;
 }
@@ -634,7 +678,7 @@ bool UnitATECC608B::updateSHA256(const uint8_t* msg, const uint32_t mlen)
     const uint8_t* ptr = msg;
     bool ok{true};
 
-    auto idle_wakeup_at = m5::utility::millis() + 1000;
+    m5::utility::elapsed_time_t idle_wakeup_at = m5::utility::millis();
 
     while (remaining > 0) {
         uint16_t chunk_size = (remaining >= BLOCK_SIZE) ? BLOCK_SIZE : remaining;
@@ -654,16 +698,16 @@ bool UnitATECC608B::updateSHA256(const uint8_t* msg, const uint32_t mlen)
         remaining -= chunk_size;
 
         // When long data comes in, WDT causes 0xEE error, so to prevent this, idle -> wakeup transition is used
-        auto now = m5::utility::millis();
-        if (now > idle_wakeup_at) {
+        if (m5::utility::elapsedSince(idle_wakeup_at) >= IDLE_WAKEUP_INTERVAL_MS) {
             if (!idle() || !wakeup()) {
                 ok = false;
                 break;
             }
-            idle_wakeup_at = now + 1000;
+            idle_wakeup_at = m5::utility::millis();
         }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::finalizeSHA256(const atecc608::Destination dest, uint8_t digest[32])
@@ -680,7 +724,8 @@ bool UnitATECC608B::finalizeSHA256(const atecc608::Destination dest, uint8_t dig
         m5::utility::delay(DELAY_SHA);
         ok = receive_response(digest, 32);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::ecdh_receive32(uint8_t out[32], const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64])
@@ -695,7 +740,8 @@ bool UnitATECC608B::ecdh_receive32(uint8_t out[32], const uint8_t mode, const ui
         m5::utility::delay(DELAY_ECDH);
         ok = receive_response(out, 32);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const uint8_t mode, const uint16_t param2,
@@ -717,7 +763,8 @@ bool UnitATECC608B::ecdh_receive32x2(uint8_t out[32], uint8_t nonce[32], const u
             memcpy(nonce, buf + 32, 32);
         }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::ecdh_no_output(const uint8_t mode, const uint16_t param2, const uint8_t pubKey[64])
@@ -731,7 +778,8 @@ bool UnitATECC608B::ecdh_no_output(const uint8_t mode, const uint16_t param2, co
         uint8_t status{};
         ok = receive_response(&status, 1) && (status == 0);
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 bool UnitATECC608B::verify(uint8_t mac[32], const uint8_t mode, const uint16_t param2, const uint8_t signature[64],
@@ -773,12 +821,13 @@ bool UnitATECC608B::verify(uint8_t mac[32], const uint8_t mode, const uint16_t p
             }
         }
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 //
 bool UnitATECC608B::send_command(const uint8_t opcode, const uint8_t param1, const uint16_t param2, const uint8_t* data,
-                                 uint32_t dlen)
+                                 const uint32_t dlen)
 {
     constexpr uint32_t MAX_DLEN{148};  // Max data: packet = dlen+8, count byte max 155
     if (dlen > MAX_DLEN) {
@@ -815,13 +864,17 @@ bool UnitATECC608B::receive_response(uint8_t* data, const uint32_t dlen)
         return false;
     }
 
-    memset(data, 0, dlen);
-
     // Read entire response in a single I2C transaction: count(1) + data(dlen) + CRC(2)
     // This avoids splitting the read into two transactions, which causes read timeout
     // on m5gfx I2C (I2C_Class) when the body exceeds ~32 bytes.
     const uint32_t max_read = dlen + 3;
     uint8_t rbuf[158]{};  // Max: dlen(max 155) + 3 = 158
+    if (max_read > sizeof(rbuf)) {
+        M5_LIB_LOGE("Response too large: dlen:%u", dlen);
+        return false;
+    }
+
+    memset(data, 0, dlen);
     auto rerr = readWithTransaction(rbuf, max_read);
     if (rerr != m5::hal::error::error_t::OK) {
         M5_LIB_LOGE("Failed to read response");
@@ -829,8 +882,8 @@ bool UnitATECC608B::receive_response(uint8_t* data, const uint32_t dlen)
     }
 
     const uint32_t count = rbuf[0];
-    if (count < 4) {
-        M5_LIB_LOGE("Invalid response count: %u", count);
+    if (count < 4 || count > max_read) {
+        M5_LIB_LOGE("Invalid response count: %u (max:%u)", count, max_read);
         return false;
     }
 
@@ -874,9 +927,10 @@ bool UnitATECC608B::read_slot_config_word(uint16_t& cfg, const uint8_t baseOffse
     uint8_t v[4]{};
     bool ok = wakeup() && read_data(v, sizeof(v), ZONE_CONFIG, offset_to_param2_for_config(offset));
     if (ok) {
-        cfg = v[idx] | (v[idx + 1] << 8);  // LE
+        cfg = m5::types::little_uint16_t(v[idx], v[idx + 1]).get();
     }
-    return idle() && ok;
+    idle();
+    return ok;
 }
 
 }  // namespace unit

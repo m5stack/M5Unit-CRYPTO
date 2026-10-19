@@ -6,9 +6,10 @@
 /*
   UnitTest for UnitATECC608B_TNGTLS
 
-  NOTE: These tests do NOT perform any irreversible operations (Lock, Write, PrivWrite,
+  NOTE: These tests do NOT perform any irreversible operations (Lock, PrivWrite,
   private key generation, counter increment, etc.).  All operations are read-only,
-  volatile-SRAM-only, or diagnostic (SelfTest).
+  volatile-SRAM-only, or diagnostic (SelfTest), except that Slot 8 (GeneralData) is
+  written and then restored.
 */
 #include <gtest/gtest.h>
 #include <Wire.h>
@@ -21,7 +22,6 @@
 #include <limits>
 #include <algorithm>
 #include <cmath>
-#include <esp_random.h>
 
 using namespace m5::unit::googletest;
 using namespace m5::unit;
@@ -77,7 +77,7 @@ inline bool is_valid_genkey_tempkey(const uint16_t s)
     return (s >> 14) & 1;
 }
 
-inline bool is_valid_gendlg_tempkey(const uint16_t s)
+inline bool is_valid_gendig_tempkey(const uint16_t s)
 {
     return (s >> 13) & 1;
 }
@@ -162,10 +162,11 @@ constexpr Sha256TestVector sha256_test_vectors[] = {
                        0x68, 0x0E, 0xB8, 0xF0, 0x0F, 0x8C, 0xD3, 0xB9, 0x04, 0xD6, 0x81, 0x24, 0x6D, 0x28, 0x5A, 0x0E}},
 };
 
-// For 'a' String repeated 1000000 times
-constexpr uint8_t sha256_a1000000_result[] = {0xCD, 0xC7, 0x6E, 0x5C, 0x99, 0x14, 0xFB, 0x92, 0x81, 0xA1, 0xC7,
-                                              0xE2, 0x84, 0xD7, 0x3E, 0x67, 0xF1, 0x80, 0x9A, 0x48, 0xA4, 0x97,
-                                              0x20, 0x0E, 0x04, 0x6D, 0x39, 0xCC, 0xC7, 0x11, 0x2C, 0xD0};
+// For 'a' String repeated 4096 times
+constexpr uint32_t sha256_a4096_len{4096};
+constexpr uint8_t sha256_a4096_result[] = {0xC9, 0x3E, 0xEE, 0x2D, 0x0D, 0xB0, 0x2F, 0x10, 0xAC, 0xC7, 0x46,
+                                           0x0D, 0x95, 0x76, 0xE1, 0x22, 0xDC, 0xF8, 0xCD, 0x53, 0xC4, 0xBF,
+                                           0x8D, 0xFC, 0xAE, 0x1B, 0x3E, 0x74, 0xEB, 0xCF, 0xFF, 0x5A};
 
 template <typename T, typename U>
 void test_random(UnitATECC608B_TNGTLS* u, const U l, const U h)
@@ -185,30 +186,11 @@ void test_random(UnitATECC608B_TNGTLS* u, const U l, const U h)
         result.push_back(value);
     }
     EXPECT_EQ(result.size(), 10);
-    EXPECT_FALSE(std::all_of(result.cbegin() + 1, result.cend(), [&result](const T& v) { return v == result[0]; }))
-        << "low:" << l << " high:" << h;
-}
-
-template <typename T, typename U>
-void test_random_float(UnitATECC608B_TNGTLS* u, const U l, const U h)
-{
-    const T lower  = static_cast<T>(l);
-    const T higher = static_cast<T>(h);
-
-    uint32_t count{10};
-    std::vector<T> result;
-
-    while (count--) {
-        T value{};
-        EXPECT_TRUE(u->readRandom(value, lower, higher));  // [lower ... higher)
-
-        EXPECT_TRUE(value < higher) << "actual=" << value << ", expected<" << higher;
-        EXPECT_TRUE(value >= lower) << "actual=" << value << ", expected>=" << lower;
-        result.push_back(value);
+    // With only 2 possible values, 10 equal draws happen with probability 1/512
+    if (higher > lower + 2) {
+        EXPECT_FALSE(std::all_of(result.cbegin() + 1, result.cend(), [&result](const T& v) { return v == result[0]; }))
+            << "low:" << l << " high:" << h;
     }
-    EXPECT_EQ(result.size(), 10);
-    EXPECT_FALSE(std::all_of(result.cbegin() + 1, result.cend(), [&result](const T& v) { return v == result[0]; }))
-        << "low:" << l << " high:" << h;
 }
 
 }  // namespace
@@ -283,6 +265,8 @@ TEST_F(TestATECC608B_TNGTLS, Info)
 
 TEST_F(TestATECC608B_TNGTLS, Nonce)
 {
+    SCOPED_TRACE(ustr);
+
     uint16_t state{};
     uint8_t input20[20]{0x55};
     uint8_t output[32]{};
@@ -364,7 +348,7 @@ TEST_F(TestATECC608B_TNGTLS, Nonce)
     EXPECT_TRUE(unit->readDeviceState(state));
     EXPECT_FALSE(is_valid_tempkey(state));
 
-    // Write 32-byte nonce (Illegal dest)
+    // Write 64-byte nonce (Illegal dest)
     EXPECT_TRUE(clear_tempkey(unit.get()));
     EXPECT_FALSE(unit->writeNonce64(Destination::AlternateKeyBuffer, nonce64));
     EXPECT_FALSE(unit->writeNonce64(Destination::ExternalBuffer, nonce64));
@@ -412,7 +396,7 @@ TEST_F(TestATECC608B_TNGTLS, Random)
     test_random<uint64_t>(unit.get(), 4, 6);                      // 4 ... 5
 
 #if defined(__SIZEOF_INT128__)
-#pragma message "Support int/uint128_t"
+#pragma message("Support int/uint128_t")
     test_random<int128_t>(unit.get(), std::numeric_limits<int128_t>::lowest(),
                           std::numeric_limits<int128_t>::max());  // lowest ... (max-1)
     test_random<int128_t>(unit.get(), -5, -2);                    // -5 ... -3
@@ -452,20 +436,8 @@ TEST_F(TestATECC608B_TNGTLS, SHA256)
 
     uint16_t state{};
 
-    // Skip: 'a' String repeated 1000000 times
-    // Disabled due to insufficient heap on most embedded targets (1MB allocation).
-    // The SHA256 1M test vector is validated via the smaller test vectors above.
-    constexpr uint32_t ilen{1000000};
-    uint8_t* in = nullptr;
-#if 0
-    in = (uint8_t*)malloc(1000000);
-    if (in) {
-        memset(in, (uint8_t)('a'), ilen);
-    }
-#endif
-
     // TempKey
-    for (int i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
+    for (size_t i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
         uint8_t digest[32]{};
         auto& e = sha256_test_vectors[i];
         SCOPED_TRACE(e.name);
@@ -476,19 +448,6 @@ TEST_F(TestATECC608B_TNGTLS, SHA256)
         EXPECT_TRUE(unit->updateSHA256(e.input, e.input_len));
         EXPECT_TRUE(unit->finalizeSHA256(Destination::TempKey, digest));
         EXPECT_TRUE(memcmp(digest, e.expected, 32) == 0);
-
-        EXPECT_TRUE(unit->readDeviceState(state));
-        EXPECT_TRUE(is_valid_tempkey(state));
-        EXPECT_TRUE(is_external_source_tempkey(state));
-    }
-    if (in) {
-        uint8_t digest[32]{};
-        EXPECT_TRUE(clear_tempkey(unit.get()));
-
-        EXPECT_TRUE(unit->startSHA256());
-        EXPECT_TRUE(unit->updateSHA256(in, ilen));
-        EXPECT_TRUE(unit->finalizeSHA256(Destination::TempKey, digest));
-        EXPECT_TRUE(memcmp(digest, sha256_a1000000_result, 32) == 0);
 
         EXPECT_TRUE(unit->readDeviceState(state));
         EXPECT_TRUE(is_valid_tempkey(state));
@@ -497,7 +456,7 @@ TEST_F(TestATECC608B_TNGTLS, SHA256)
 
     // MsgDigestBuffer
     EXPECT_TRUE(clear_tempkey(unit.get()));
-    for (int i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
+    for (size_t i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
         uint8_t digest[32]{};
         auto& e = sha256_test_vectors[i];
         SCOPED_TRACE(e.name);
@@ -510,20 +469,10 @@ TEST_F(TestATECC608B_TNGTLS, SHA256)
         EXPECT_TRUE(unit->readDeviceState(state));
         EXPECT_FALSE(is_valid_tempkey(state));
     }
-    if (in) {
-        uint8_t digest[32]{};
-        EXPECT_TRUE(unit->startSHA256());
-        EXPECT_TRUE(unit->updateSHA256(in, ilen));
-        EXPECT_TRUE(unit->finalizeSHA256(Destination::MsgDigestBuffer, digest));
-        EXPECT_TRUE(memcmp(digest, sha256_a1000000_result, 32) == 0);
-
-        EXPECT_TRUE(unit->readDeviceState(state));
-        EXPECT_FALSE(is_valid_tempkey(state));
-    }
 
     // ExternalBuffer
     EXPECT_TRUE(clear_tempkey(unit.get()));
-    for (int i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
+    for (size_t i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
         uint8_t digest[32]{};
         auto& e = sha256_test_vectors[i];
         SCOPED_TRACE(e.name);
@@ -537,20 +486,10 @@ TEST_F(TestATECC608B_TNGTLS, SHA256)
         // M5_LOGW("%04X", state);
         EXPECT_FALSE(is_valid_tempkey(state));
     }
-    if (in) {
-        uint8_t digest[32]{};
-        EXPECT_TRUE(unit->startSHA256());
-        EXPECT_TRUE(unit->updateSHA256(in, ilen));
-        EXPECT_TRUE(unit->finalizeSHA256(Destination::ExternalBuffer, digest));
-        EXPECT_TRUE(memcmp(digest, sha256_a1000000_result, 32) == 0);
-
-        EXPECT_TRUE(unit->readDeviceState(state));
-        EXPECT_FALSE(is_valid_tempkey(state));
-    }
 
     // Invalid dest
     EXPECT_TRUE(clear_tempkey(unit.get()));
-    for (int i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
+    for (size_t i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
         uint8_t digest[32]{};
         auto& e = sha256_test_vectors[i];
         SCOPED_TRACE(e.name);
@@ -563,18 +502,18 @@ TEST_F(TestATECC608B_TNGTLS, SHA256)
         EXPECT_TRUE(unit->readDeviceState(state));
         EXPECT_FALSE(is_valid_tempkey(state));
     }
-    if (in) {
-        uint8_t digest[32]{};
-        EXPECT_TRUE(unit->startSHA256());
-        EXPECT_TRUE(unit->updateSHA256(in, 4));
-        EXPECT_FALSE(unit->finalizeSHA256(Destination::AlternateKeyBuffer, digest));
-        EXPECT_FALSE(memcmp(digest, sha256_a1000000_result, 32) == 0);
+}
 
-        EXPECT_TRUE(unit->readDeviceState(state));
-        EXPECT_FALSE(is_valid_tempkey(state));
-    }
+// A long message takes several seconds, so updateSHA256 goes idle and wakes up again on the way
+// (the watchdog would expire otherwise)
+TEST_F(TestATECC608B_TNGTLS, SHA256_LongMessage)
+{
+    SCOPED_TRACE(ustr);
 
-    free(in);
+    std::vector<uint8_t> msg(sha256_a4096_len, static_cast<uint8_t>('a'));
+    uint8_t digest[32]{};
+    EXPECT_TRUE(unit->SHA256(Destination::ExternalBuffer, digest, msg.data(), msg.size()));
+    EXPECT_EQ(memcmp(digest, sha256_a4096_result, 32), 0);
 }
 
 TEST_F(TestATECC608B_TNGTLS, ECDHStoredKey)
@@ -796,7 +735,7 @@ TEST_F(TestATECC608B_TNGTLS, GenKey)
     }
 
     // Public Key Digest
-    const uint8_t nonce64[]{0x12};
+    const uint8_t nonce64[64]{0x12};
     const uint8_t other[3]{0x01, 0x02, 0x03};
 
     EXPECT_TRUE(clear_tempkey(unit.get()));
@@ -947,19 +886,34 @@ TEST_F(TestATECC608B_TNGTLS, ZoneLock)
     // Slot lock status
     uint16_t slotLockedBits{};
     EXPECT_TRUE(unit->readSlotLocked(slotLockedBits));
-    // On TNGTLS, Slots 0 and 1 should be individually locked (bit=0 means locked)
-    EXPECT_EQ(slotLockedBits & (1 << 0), 0) << "Slot 0 should be locked";
-    EXPECT_EQ(slotLockedBits & (1 << 1), 0) << "Slot 1 should be locked";
+    // Slots 0 and 1 cannot be individually locked on TNGTLS (only 2-4, 6 and 8 can),
+    // so their bits are 0 (a set bit means locked)
+    EXPECT_EQ(slotLockedBits & (1 << 0), 0) << "Slot 0 cannot be individually locked";
+    EXPECT_EQ(slotLockedBits & (1 << 1), 0) << "Slot 1 cannot be individually locked";
+
+    // Matches the SlotLocked bytes (offset 88-89, little endian, inverted) in the config zone
+    uint8_t config[128]{};
+    EXPECT_TRUE(unit->readConfigZone(config));
+    EXPECT_EQ(slotLockedBits, static_cast<uint16_t>((config[88] | (config[89] << 8)) ^ 0xFFFF));
 }
 
 TEST_F(TestATECC608B_TNGTLS, SlotKeyConfig)
 {
     SCOPED_TRACE(ustr);
 
+    uint8_t config[128]{};
+    EXPECT_TRUE(unit->readConfigZone(config));
+
     for (uint8_t s = 0; s < 16; ++s) {
         uint16_t slotCfg{}, keyCfg{};
         EXPECT_TRUE(unit->readSlotConfig(slotCfg, (Slot)s)) << "Slot " << (int)s;
         EXPECT_TRUE(unit->readKeyConfig(keyCfg, (Slot)s)) << "Slot " << (int)s;
+
+        // Matches SlotConfig (offset 20) / KeyConfig (offset 96) in the config zone (little endian)
+        EXPECT_EQ(slotCfg, static_cast<uint16_t>(config[20 + s * 2] | (config[20 + s * 2 + 1] << 8)))
+            << "Slot " << (int)s;
+        EXPECT_EQ(keyCfg, static_cast<uint16_t>(config[96 + s * 2] | (config[96 + s * 2 + 1] << 8)))
+            << "Slot " << (int)s;
 
         // Verify ECC key slots (0-4) have KeyType = P256 (bits 4:2 == 0b100)
         if (s <= 4) {
@@ -1034,7 +988,7 @@ TEST_F(TestATECC608B_TNGTLS, SHA256_Convenience)
     SCOPED_TRACE(ustr);
 
     // Test the convenience SHA256() method against known test vectors
-    for (int i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
+    for (size_t i = 0; i < m5::stl::size(sha256_test_vectors); ++i) {
         uint8_t digest[32]{};
         auto& e = sha256_test_vectors[i];
         SCOPED_TRACE(e.name);
@@ -1176,21 +1130,37 @@ TEST_F(TestATECC608B_TNGTLS, SlotSize)
     }
 }
 
-TEST_F(TestATECC608B_TNGTLS, Config)
+TEST_F(TestATECC608B_TNGTLS, BeginAppliesConfig)
 {
     SCOPED_TRACE(ustr);
 
-    auto cfg = unit->config();
-    EXPECT_TRUE(cfg.idle);  // default
+    const auto org = unit->config();
+    EXPECT_TRUE(org.idle);  // default
 
-    UnitATECC608B_TNGTLS::config_t cfg2;
-    cfg2.idle = false;
-    unit->config(cfg2);
-    EXPECT_FALSE(unit->config().idle);
+    uint8_t nonce[32]{};
+    memset(nonce, 0x5A, sizeof(nonce));
+    uint16_t state{};
+    UnitATECC608B_TNGTLS::config_t cfg{};
+
+    // idle: begin() ends in idle, so TempKey (SRAM) is kept
+    cfg.idle = true;
+    unit->config(cfg);
+    EXPECT_TRUE(unit->writeNonce32(Destination::TempKey, nonce));
+    EXPECT_TRUE(unit->begin());
+    EXPECT_TRUE(unit->readDeviceState(state));
+    EXPECT_TRUE(is_valid_tempkey(state)) << "TempKey should survive begin() with idle";
+
+    // sleep: begin() ends in sleep, so TempKey is cleared
+    cfg.idle = false;
+    unit->config(cfg);
+    EXPECT_TRUE(unit->writeNonce32(Destination::TempKey, nonce));
+    EXPECT_TRUE(unit->begin());
+    EXPECT_TRUE(unit->readDeviceState(state));
+    EXPECT_FALSE(is_valid_tempkey(state)) << "TempKey should be cleared by begin() with sleep";
 
     // Restore
-    unit->config(cfg);
-    EXPECT_TRUE(unit->config().idle);
+    unit->config(org);
+    EXPECT_TRUE(unit->begin());
 }
 
 TEST_F(TestATECC608B_TNGTLS, WakeupIdleSleep)
@@ -1199,6 +1169,7 @@ TEST_F(TestATECC608B_TNGTLS, WakeupIdleSleep)
 
     uint16_t state{};
 
+    // Assumes config().idle == true (each command ends in idle)
     // Write nonce to TempKey, then idle — TempKey should be preserved
     EXPECT_TRUE(unit->writeNonce32(Destination::TempKey,
                                    (const uint8_t[]){0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
@@ -1220,6 +1191,21 @@ TEST_F(TestATECC608B_TNGTLS, WakeupIdleSleep)
     EXPECT_TRUE(unit->wakeup());
     EXPECT_TRUE(unit->readDeviceState(state));
     EXPECT_FALSE(is_valid_tempkey(state)) << "TempKey should be cleared after sleep";
+
+    // idle() / sleep() report the result: a device that is not awake does not ACK (state is idle here)
+    EXPECT_FALSE(unit->idle());
+    EXPECT_FALSE(unit->sleep());
+
+    // Waking up an awake device (it may go through the retry) keeps TempKey
+    EXPECT_TRUE(unit->writeNonce32(Destination::TempKey,
+                                   (const uint8_t[]){0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B,
+                                                     0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
+                                                     0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40}));
+    EXPECT_TRUE(unit->wakeup());
+    EXPECT_TRUE(unit->wakeup());
+    EXPECT_TRUE(unit->idle());
+    EXPECT_TRUE(unit->readDeviceState(state));
+    EXPECT_TRUE(is_valid_tempkey(state)) << "TempKey should survive waking up an awake device";
 }
 
 TEST_F(TestATECC608B_TNGTLS, Counter_InvalidID)
@@ -1326,8 +1312,6 @@ TEST_F(TestATECC608B_TNGTLS, SelfTest_Individual)
     EXPECT_EQ(result, 0x00);
 }
 
-// --- A. OTPValidation depth improvement is done inline above ---
-
 // --- B. verifyStored: verify signature using stored public key in Slot 11 ---
 TEST_F(TestATECC608B_TNGTLS, VerifyStored)
 {
@@ -1338,9 +1322,8 @@ TEST_F(TestATECC608B_TNGTLS, VerifyStored)
                                 0x5B, 0x6C, 0x7D, 0x8E, 0x9F, 0x10, 0x21, 0x32, 0x43, 0x54, 0x65,
                                 0x76, 0x87, 0x98, 0xA9, 0xBA, 0xCB, 0xDC, 0xED, 0xFE, 0x0F};
 
-    // Sign with Slot 0 (PrimaryPrivateKey), verify with Slot 11 (SignerPublicKey)
-    // Slot 11 stores the signer's public key — this verifies signer-signed messages, not device-signed.
-    // Instead, sign with Slot 0 and verify externally, then use verifyStored with Slot 11 for a signer test.
+    // Sign with Slot 0 (PrimaryPrivateKey) and check that verifyStored with Slot 11 (SignerPublicKey) fails,
+    // since Slot 11 holds the signer's public key, not the one paired with Slot 0
 
     // First, verify that Slot 11 has a valid public key by reading it
     uint8_t signerPubKey[72]{};
@@ -1366,11 +1349,6 @@ TEST_F(TestATECC608B_TNGTLS, VerifyStored)
 TEST_F(TestATECC608B_TNGTLS, InvalidSlotNumber)
 {
     SCOPED_TRACE(ustr);
-
-    uint16_t cfg{};
-    // Slots 7, 13, 14, 15 are reserved in TNGTLS but valid slot numbers (0-15)
-    // Slot numbers beyond 15 are invalid for readSlotConfig/readKeyConfig
-    // (the Slot enum is uint8_t, so we cast to test out-of-range)
 
     // readDataZone with reserved/non-readable slots
     uint8_t buf[36]{};
@@ -1455,13 +1433,75 @@ TEST_F(TestATECC608B_TNGTLS, CertificateChainVerification)
         << "Slot 11 should contain signer public key";
 }
 
+// The DER signature is 73-75 bytes (or shorter with leading zeros) depending on the MSB of R and S.
+// Check that every length fits the buffer and the certificate length is adjusted (no device access)
+TEST(CertificateSignature, Length)
+{
+    struct Pattern {
+        uint8_t r0, r1;    // First bytes of R
+        uint8_t s0;        // First byte of S
+        uint32_t der_len;  // Expected DER signature length
+    };
+    constexpr Pattern patterns[] = {
+        {0x11, 0x11, 0x22, 73},  // R, S MSB 0
+        {0x91, 0x11, 0x22, 74},  // R MSB 1
+        {0x91, 0x11, 0xA2, 75},  // R, S MSB 1 (largest)
+        {0x00, 0x11, 0x22, 72},  // R with a leading zero byte
+    };
+    struct Template {
+        const uint8_t* data;
+        uint32_t size;
+        uint16_t offset_signature;
+        uint16_t max_size;
+    };
+    const Template templates[] = {
+        {template_for_device, template_for_device_size, 473, MAX_DEVICE_CERTIFICATE_SIZE},
+        {template_for_signer, template_for_signer_size, 446, MAX_SIGNER_CERTIFICATE_SIZE},
+    };
+
+    for (auto&& t : templates) {
+        // The outer SEQUENCE length of the template covers everything after its 4-byte header
+        EXPECT_EQ(t.data[0], 0x30);
+        EXPECT_EQ(t.data[1], 0x82);
+        EXPECT_EQ((t.data[2] << 8) | t.data[3], t.size - 4);
+
+        for (auto&& p : patterns) {
+            SCOPED_TRACE(t.size);
+            SCOPED_TRACE(p.der_len);
+            uint8_t sig[64]{};
+            memset(sig, 0x33, sizeof(sig));
+            sig[0]  = p.r0;
+            sig[1]  = p.r1;
+            sig[32] = p.s0;
+
+            uint8_t cert[600]{};
+            memcpy(cert, t.data, t.size);
+            uint16_t olen = t.max_size;
+            EXPECT_TRUE(insert_certificate_signature(cert, olen, t.size, t.offset_signature, sig));
+            EXPECT_EQ(olen, t.offset_signature + p.der_len);
+            EXPECT_LE(olen, t.max_size);
+            EXPECT_EQ((cert[2] << 8) | cert[3], olen - 4);           // Outer SEQUENCE length
+            EXPECT_EQ(cert[t.offset_signature], 0x03);               // BIT STRING
+            EXPECT_EQ(cert[t.offset_signature + 1], p.der_len - 2);  // BIT STRING length
+            EXPECT_EQ(cert[olen - 1], 0x33);                         // Last byte of S
+
+            // One byte short of the signature
+            memcpy(cert, t.data, t.size);
+            olen = t.offset_signature + p.der_len - 1;
+            EXPECT_FALSE(insert_certificate_signature(cert, olen, t.size, t.offset_signature, sig));
+        }
+    }
+}
+
 TEST_F(TestATECC608B_TNGTLS, ReadWriteGeneralData)
 {
     SCOPED_TRACE(ustr);
 
-    // Save original data at offset 0
+    // Save original data at offset 0 and 352
     uint8_t original[32]{};
     EXPECT_TRUE(unit->readGeneralData(original, 32, 0));
+    uint8_t original2[32]{};
+    EXPECT_TRUE(unit->readGeneralData(original2, 32, 352));
 
     // Write test pattern
     uint8_t pattern[32]{};
@@ -1486,13 +1526,16 @@ TEST_F(TestATECC608B_TNGTLS, ReadWriteGeneralData)
     EXPECT_TRUE(unit->readGeneralData(readback2, 32, 352));
     EXPECT_EQ(memcmp(pattern2, readback2, 32), 0) << "Write/read mismatch at offset 352";
 
-    // Restore original data at offset 0
+    // Restore original data
     EXPECT_TRUE(unit->writeGeneralData(original, 32, 0));
+    EXPECT_TRUE(unit->writeGeneralData(original2, 32, 352));
 
     // Verify restore
     uint8_t verify[32]{};
     EXPECT_TRUE(unit->readGeneralData(verify, 32, 0));
-    EXPECT_EQ(memcmp(original, verify, 32), 0) << "Restore failed";
+    EXPECT_EQ(memcmp(original, verify, 32), 0) << "Restore failed at offset 0";
+    EXPECT_TRUE(unit->readGeneralData(verify, 32, 352));
+    EXPECT_EQ(memcmp(original2, verify, 32), 0) << "Restore failed at offset 352";
 }
 
 TEST_F(TestATECC608B_TNGTLS, ReadWriteGeneralData_InvalidArgs)

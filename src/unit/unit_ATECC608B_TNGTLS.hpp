@@ -47,16 +47,16 @@ public:
     ///@{
     /*!
       @brief Read the device certificate (DER)
-      @param[out] out Output buffer
-      @param[in,out] in:Output buffer length out:Length of output to buffer
+      @param[out] out Output buffer at least atecc608::MAX_DEVICE_CERTIFICATE_SIZE bytes
+      @param[in,out] olen In: output buffer length / Out: certificate length
       @param fillAuthKeyId Fill auth key id from signer if true
       @return True if successful
      */
     bool readDeviceCertificate(uint8_t* out, uint16_t& olen, const bool fillAuthKeyId = true);
     /*!
       @brief Read the signer certificate (DER)
-      @param[out] out Output buffer
-      @param[in,out] in:Output buffer length out:Length of output to buffer
+      @param[out] out Output buffer at least atecc608::MAX_SIGNER_CERTIFICATE_SIZE bytes
+      @param[in,out] olen In: output buffer length / Out: certificate length
       @return True if successful
      */
     bool readSignerCertificate(uint8_t* out, uint16_t& olen);

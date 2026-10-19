@@ -10,12 +10,11 @@
 #include <M5UnitUnified.h>
 #include <M5UnitUnifiedCRYPTO.h>
 #include <M5Utility.h>
-#include <M5HAL.hpp>
-#include <soc/gpio_reg.h>
-#include <soc/gpio_sig_map.h>
+#include <vector>
+#include <wiring/m5_unit_unified_wiring.hpp>  // Board-aware connection helpers (include last)
 
-// Enable this define when using M5Core2AWS's built-in chip
 #if !defined(USING_M5CORE2_AWS_BUILTIN)
+// For Core2 for AWS built-in ATECC608B (K010-AWS)
 // #define USING_M5CORE2_AWS_BUILTIN
 #endif
 
@@ -106,7 +105,7 @@ void dump_config(const uint8_t c[128])
     }
 }
 
-};  // namespace
+}  // namespace
 
 void setup()
 {
@@ -116,73 +115,26 @@ void setup()
         lcd.setRotation(1);
     }
 
-    auto board = M5.getBoard();
-
-    bool unit_ready{};
 #if defined(USING_M5CORE2_AWS_BUILTIN)
-#pragma message "Using builtin ATECC608B"
-    // Core2 AWS: Use M5.In_I2C for built-in ATECC608B
-    if (board == m5::board_t::board_M5StackCore2) {
-        M5_LOGI("Using M5.In_I2C");
-        unit_ready = Units.add(unit, M5.In_I2C) && Units.begin();
-    } else {
+#pragma message("Using builtin ATECC608B")
+    // Core2 AWS: the built-in ATECC608B is on the internal bus (M5.In_I2C)
+    if (M5.getBoard() != m5::board_t::board_M5StackCore2) {
         M5_LOGE("Only Core2AWS");
-        lcd.fillScreen(TFT_RED);
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
+    const bool unit_ready = Units.add(unit, M5.In_I2C) && Units.begin();
 #else
-    // NessoN1: Arduino Wire (I2C_NUM_0) cannot be used for GROVE port.
-    //   Wire is used by M5Unified In_I2C for internal devices (IOExpander etc.).
-    //   Wire1 exists but is reserved for HatPort — cannot be used for GROVE.
-    //   Reconfiguring Wire to GROVE pins breaks In_I2C, causing ESP_ERR_INVALID_STATE in M5.update().
-    //   Solution: Use SoftwareI2C via M5HAL (bit-banging) for the GROVE port.
-    // NanoC6: Wire.begin() on GROVE pins conflicts with m5::I2C_Class registered by Ex_I2C.setPort()
-    //   on the same I2C_NUM_0, causing sporadic NACK errors.
-    //   Solution: Use M5.Ex_I2C (m5::I2C_Class) directly instead of Arduino Wire.
-    if (board == m5::board_t::board_ArduinoNessoN1) {
-        // NessoN1: GROVE is on port_b (GPIO 5/4), not port_a (which maps to Wire pins 8/10)
-        auto pin_num_sda = M5.getPin(m5::pin_name_t::port_b_out);
-        auto pin_num_scl = M5.getPin(m5::pin_name_t::port_b_in);
-        M5_LOGI("getPin(M5HAL): SDA:%u SCL:%u", pin_num_sda, pin_num_scl);
-        m5::hal::bus::I2CBusConfig i2c_cfg;
-        i2c_cfg.pin_sda = m5::hal::gpio::getPin(pin_num_sda);
-        i2c_cfg.pin_scl = m5::hal::gpio::getPin(pin_num_scl);
-        auto i2c_bus    = m5::hal::bus::i2c::getBus(i2c_cfg);
-        M5_LOGI("Bus:%d", i2c_bus.has_value());
-        unit_ready = Units.add(unit, i2c_bus ? i2c_bus.value() : nullptr) && Units.begin();
-    } else if (board == m5::board_t::board_M5NanoC6) {
-        // NanoC6: Use M5.Ex_I2C (m5::I2C_Class, not Arduino Wire)
-        M5_LOGI("Using M5.Ex_I2C");
-        unit_ready = Units.add(unit, M5.Ex_I2C) && Units.begin();
-    } else {
-        auto pin_num_sda = M5.getPin(m5::pin_name_t::port_a_sda);
-        auto pin_num_scl = M5.getPin(m5::pin_name_t::port_a_scl);
-        M5_LOGI("getPin: SDA:%u SCL:%u", pin_num_sda, pin_num_scl);
-        Wire.end();
-        Wire.begin(pin_num_sda, pin_num_scl, 400 * 1000U);
-        unit_ready = Units.add(unit, Wire) && Units.begin();
-    }
+    // Board-aware connection: NessoN1 -> SoftwareI2C on GROVE, NanoC6/NanoH2 -> M5.Ex_I2C, others -> Wire
+    const bool unit_ready = m5::unit::wiring::addI2C(Units, unit) && Units.begin();
 #endif
     if (!unit_ready) {
-        lcd.fillScreen(TFT_RED);
         M5_LOGE("Failed to begin");
-        while (true) {
-            m5::utility::delay(10000);
-        }
+        m5::unit::wiring::failStop();
     }
     M5_LOGI("M5UnitUnified initialized");
     M5_LOGI("%s", Units.debugInfo().c_str());
     lcd.fillScreen(TFT_DARKGREEN);
 
-    // Diagnostic mode: Units.begin() includes readRevision in unit.begin().
-    // Stop here to evaluate wakeup/revision stability without additional API load.
-    constexpr bool DIAG_REVISION_ONLY = false;
-    if (DIAG_REVISION_ONLY) {
-        M5_LOGI("DIAG_REVISION_ONLY=1: skip readConfigZone/readOTPZone/readDataZone...");
-        return;
-    }
-
-    // Step mode for staged recovery.
     uint8_t config[128]{};
     if (!unit.readConfigZone(config)) {
         M5_LOGE("readConfigZone NG");
@@ -193,8 +145,8 @@ void setup()
         M5_LOGE("readOTPZone NG");
     }
 
-    uint8_t data[unit.getSlotSize(Slot::GeneralData)]{};
-    if (!unit.readDataZone(data, sizeof(data), Slot::GeneralData)) {
+    std::vector<uint8_t> data(unit.getSlotSize(Slot::GeneralData));
+    if (!unit.readDataZone(data.data(), data.size(), Slot::GeneralData)) {
         M5_LOGE("readDataZone NG");
     }
 
@@ -231,7 +183,7 @@ void setup()
     m5::utility::log::dump(otp, sizeof(otp), false);
 
     M5.Log.printf("Dump Data zone (8:GeneralData) ----------------\n");
-    m5::utility::log::dump(data, sizeof(data), false);
+    m5::utility::log::dump(data.data(), data.size(), false);
 
     M5.Log.printf("KeyValid ----------------\n");
     m5::utility::log::dump(key_valid, sizeof(key_valid), false);
@@ -301,3 +253,34 @@ void loop()
 
     m5::utility::delay(50);
 }
+
+#if !defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_timer.h>
+
+#if CONFIG_FREERTOS_UNICORE
+static inline void feedIdleTaskPeriodically(void)
+{
+    constexpr uint32_t FEED_INTERVAL_MS{2000};
+    constexpr TickType_t FEED_SLEEP_TICKS{pdMS_TO_TICKS(5)};
+    static uint32_t s_last_feed_ms{};
+    const uint32_t now_ms{static_cast<uint32_t>(esp_timer_get_time() / 1000)};
+    if (now_ms - s_last_feed_ms >= FEED_INTERVAL_MS) {
+        s_last_feed_ms = now_ms;
+        vTaskDelay(FEED_SLEEP_TICKS);
+    }
+}
+#endif
+
+extern "C" void app_main(void)
+{
+    setup();
+    for (;;) {
+#if CONFIG_FREERTOS_UNICORE
+        feedIdleTaskPeriodically();
+#endif
+        loop();
+    }
+}
+#endif

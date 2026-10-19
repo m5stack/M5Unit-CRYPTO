@@ -10,18 +10,22 @@
 #include <M5UnitUnified.h>
 #include <M5UnitUnifiedCRYPTO.h>
 #include <M5Utility.h>
-#include <M5HAL.hpp>
+#include <wiring/m5_unit_unified_wiring.hpp>  // Board-aware connection helpers (include last)
 
-#include <WiFi.h>
+#include <esp_system.h>
+#include <algorithm>
+#include <cstring>
+#include <esp_idf_version.h>
 
 #include <mbedtls/ssl.h>
 #include <mbedtls/net_sockets.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/debug.h>
 
-#include "../src/mbedtls_pk_info_compat.h"
+// The TLS device key in the ATECC608B (the only part that depends on the mbedtls version)
+#include "../src/device_key.hpp"
+// Wi-Fi station connect (esp_wifi for both frameworks; handles esp_hosted boards such as Tab5)
+#include "../src/wifi_connect.hpp"
 
 using namespace m5::unit::atecc608;
 
@@ -32,9 +36,25 @@ namespace {
 // ****************************************************************************************************
 // Fill in the following define or specify with build option
 // ****************************************************************************************************
-// Enable this define when using M5Core2AWS's built-in chip
 #if !defined(USING_M5CORE2_AWS_BUILTIN)
+// For Core2 for AWS built-in ATECC608B (K010-AWS)
 // #define USING_M5CORE2_AWS_BUILTIN
+#endif
+
+// ESP-IDF: the settings come from menuconfig (main/Kconfig.projbuild)
+#if !defined(ARDUINO)
+#if !defined(EXAMPLE_SSID)
+#define EXAMPLE_SSID CONFIG_EXAMPLE_WIFI_SSID
+#endif
+#if !defined(EXAMPLE_PASSWORD)
+#define EXAMPLE_PASSWORD CONFIG_EXAMPLE_WIFI_PASSWORD
+#endif
+#if !defined(EXAMPLE_MQTT_URI)
+#define EXAMPLE_MQTT_URI CONFIG_EXAMPLE_MQTT_URI
+#endif
+#if !defined(EXAMPLE_MQTT_PORT)
+#define EXAMPLE_MQTT_PORT CONFIG_EXAMPLE_MQTT_PORT
+#endif
 #endif
 
 #if !defined(EXAMPLE_SSID)
@@ -112,13 +132,19 @@ mbedtls_x509_crt clicert{};  // Client device cert
 mbedtls_pk_context pkey{};   //
 mbedtls_ssl_config conf{};
 mbedtls_ssl_context ssl{};
-mbedtls_ctr_drbg_context ctr_drbg{};
-mbedtls_entropy_context entropy{};
 mbedtls_net_context server_fd{};
-mbedtls_pk_info_t my_pk_info{};
 
 char mqtt_topic[128]{};  // Top level topic and thing name
 bool waiting_pingresp{};
+
+// Time to wait for the server (TLS handshake, CONNACK, SUBACK). A tethered or cellular link can take several seconds
+constexpr uint32_t SERVER_RESPONSE_TIMEOUT_MS{15000};
+// Read timeout after the handshake. Must be shorter than the MQTT keep alive (10 s) so that the loop sends PINGREQ
+// in time (the server closes the connection after 1.5 x keep alive without packets)
+constexpr uint32_t MQTT_READ_TIMEOUT_MS{5000};
+// Connection attempts (TLS + MQTT) before giving up
+constexpr uint32_t CONNECT_ATTEMPTS{3};
+constexpr uint32_t CONNECT_RETRY_INTERVAL_MS{3000};
 
 uint16_t get_next_packet_id()
 {
@@ -162,7 +188,8 @@ void dump_cert(const mbedtls_x509_crt *cert, const bool raw = false)
         M5_LOGI("SAN Tag:%d Len:%zu", san->buf.tag, san->buf.len);
     }
 
-    char buf[2048]{};
+    // Called from the TLS handshake (verify_cert), deep in the mbedtls call stack: keep the buffer off the stack
+    static char buf[2048]{};
     int ret = mbedtls_x509_crt_info(buf, sizeof(buf) - 1, "", cert);
     if (ret > 0) {
         buf[ret] = '\0';
@@ -206,178 +233,10 @@ void print_provisioning(m5::unit::UnitID &u)
     printPEM(cert, clen);
 }
 
-// If out is nullptr, only size calculation is performed
-uint32_t encode_der_integer(uint8_t *out, const uint8_t *input, uint32_t input_size)
-{
-    // Skip leading zero
-    uint32_t leading_zeros = 0;
-    while (leading_zeros < input_size && input[leading_zeros] == 0x00) {
-        leading_zeros++;
-    }
-
-    // Padding if MSB 1
-    bool needs_leading_zero = false;
-    if (leading_zeros < input_size && (input[leading_zeros] & 0x80)) {
-        needs_leading_zero = true;
-    }
-
-    // Size
-    uint32_t value_size = input_size - leading_zeros;
-    uint32_t total_size = 1 + 1 + (needs_leading_zero ? 1 : 0) + value_size;  // Tag + Length + [0x00] + value
-
-    if (out) {
-        uint32_t offset = 0;
-        out[offset++]   = 0x02;  // INTEGER tag
-        // Length
-        out[offset++] = static_cast<uint8_t>((needs_leading_zero ? 1 : 0) + value_size);
-        // Optional leading zero for positive integer
-        if (needs_leading_zero) {
-            out[offset++] = 0x00;
-        }
-        // Value
-        memcpy(out + offset, input + leading_zeros, value_size);
-    }
-    return total_size;
-}
-
-int custom_sign_callback(custom_sign_ctx_t ctx, mbedtls_md_type_t md_alg, const unsigned char *hash, size_t hash_len,
-                         unsigned char *sig,
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-                         size_t sig_size,
-#endif
-                         size_t *sig_len, int (*f_rng)(void *, unsigned char *, size_t), void *p_rng)
-{
-    (void)ctx;
-    (void)md_alg;
-    (void)(f_rng);
-    (void)(p_rng);
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    (void)sig_size;
-#endif
-
-    // Sign
-    if (hash_len != 32 || !unit.writeNonce32(Destination::MsgDigestBuffer, hash)) {
-        M5_LOGE("NONCE NG:%u", hash_len);
-        return MBEDTLS_ERR_PK_FILE_IO_ERROR;
-    }
-    uint8_t raw_sig[64]{};
-    if (!unit.signExternal(raw_sig, Slot::PrimaryPrivateKey, Source::MsgDigestBuffer)) {
-        M5_LOGE("SIGN NG:%u", hash_len);
-        return MBEDTLS_ERR_PK_FILE_IO_ERROR;
-    }
-
-    // Write DER ASN1
-    const uint8_t *R = raw_sig;
-    const uint8_t *S = raw_sig + 32;
-
-    uint8_t encoded_r[64]{};  // tag + length + optional 0x00 + value
-    uint8_t encoded_s[64]{};
-    uint32_t len_r = encode_der_integer(nullptr, R, 32);
-    uint32_t len_s = encode_der_integer(nullptr, S, 32);
-    if (len_r == 0 || len_s == 0 || len_r > sizeof(encoded_r) || len_s > sizeof(encoded_s)) {
-        M5_LOGE("Invalid encoded size R:%u S:%u", len_r, len_s);
-        return MBEDTLS_ERR_PK_BAD_INPUT_DATA;
-    }
-    encode_der_integer(encoded_r, R, 32);
-    encode_der_integer(encoded_s, S, 32);
-
-    uint8_t *p = sig;
-    *p++       = 0x30;                                 // SEQUENCE tag
-    *p++       = static_cast<uint8_t>(len_r + len_s);  // total length
-    memcpy(p, encoded_r, len_r);
-    p += len_r;
-    memcpy(p, encoded_s, len_s);
-    p += len_s;
-    *sig_len = static_cast<size_t>(p - sig);
-
-    return 0;  // OK
-}
-
-bool connectWiFi()
-{
-    // Tab5 (ESP32-P4) uses ESP32-C6 co-processor for WiFi via SDIO; set pins before WiFi.begin()
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-    if (M5.getBoard() == m5::board_t::board_M5Tab5) {
-        constexpr int SDIO2_CLK = 12;
-        constexpr int SDIO2_CMD = 13;
-        constexpr int SDIO2_D0  = 11;
-        constexpr int SDIO2_D1  = 10;
-        constexpr int SDIO2_D2  = 9;
-        constexpr int SDIO2_D3  = 8;
-        constexpr int SDIO2_RST = 15;
-        WiFi.setPins(SDIO2_CLK, SDIO2_CMD, SDIO2_D0, SDIO2_D1, SDIO2_D2, SDIO2_D3, SDIO2_RST);
-    }
-#endif
-
-    WiFi.mode(WIFI_STA);
-    if (ssid && ssid[0] && password && password[0]) {
-        M5_LOGI("Use ssid:%s and password", ssid);
-        WiFi.begin(ssid, password);
-    } else {
-        M5_LOGI("Use inner credential");
-        WiFi.begin();
-    }
-    uint32_t retry{10};
-    while (retry--) {
-        m5::utility::delay(500);
-        if (WiFi.status() == WL_CONNECTED) {
-            return true;
-        }
-        M5.Log.print(".\n");
-    }
-    return false;
-}
-
-bool init_pk(mbedtls_pk_context *pkey)
-{
-    int ret = 0;
-    uint8_t public_key[64]{};
-    mbedtls_ecp_keypair *ecp = nullptr;
-
-    if (!pkey) {
-        return false;
-    }
-
-    mbedtls_pk_init(pkey);
-
-    // sign_func to our process
-    //    my_pk_info           = *(mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-    const mbedtls_pk_info_t *orig_info = mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY);
-    memcpy(&my_pk_info, orig_info, sizeof(*orig_info));
-    my_pk_info.sign_func = custom_sign_callback;
-    if (mbedtls_pk_setup(pkey, &my_pk_info)) {
-        return false;
-    }
-
-    // Public key
-    if (!unit.generatePublicKey(public_key, Slot::PrimaryPrivateKey)) {
-        return false;
-    }
-
-    // EC
-    ecp = mbedtls_pk_ec(*pkey);
-    if (mbedtls_ecp_group_load(&ecp->MBEDTLS_PRIVATE(grp), MBEDTLS_ECP_DP_SECP256R1)) {
-        return false;
-    }
-
-    ret = mbedtls_mpi_read_binary(&ecp->MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(X), public_key, 32);
-    if (ret != 0) {
-        return false;
-    }
-    ret = mbedtls_mpi_read_binary(&ecp->MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Y), public_key + 32, 32);
-    if (ret != 0) {
-        return false;
-    }
-    if ((ret = mbedtls_mpi_lset(&ecp->MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Z), 1)) != 0) {
-        return false;
-    }
-
-    return true;
-}
-
 int verify_cert(void *data, mbedtls_x509_crt *crt, int depth, uint32_t *flags)
 {
-    char buf[1024]{};
+    // Called from the TLS handshake, deep in the mbedtls call stack: keep the buffer off the stack
+    static char buf[1024]{};
     ((void)data);
 
     M5_LOGI("Verify requested for (Depth %d):", depth);
@@ -400,18 +259,9 @@ bool connectTLS()
     mbedtls_net_init(&server_fd);
     mbedtls_ssl_init(&ssl);
     mbedtls_ssl_config_init(&conf);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_x509_crt_init(&cacert);
     mbedtls_x509_crt_init(&clicert);
     mbedtls_pk_init(&pkey);
-
-    // Seeding the random number generator
-    mbedtls_entropy_init(&entropy);
-    if ((ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *)"M5Unit-ID",
-                                     10)) != 0) {
-        M5_LOGE("failed! mbedtls_ctr_drbg_seed returned -0x%x", -ret);
-        return false;
-    }
 
     //  Load root CA
     if ((ret = mbedtls_x509_crt_parse_der(&cacert, root_ca_der, sizeof(root_ca_der))) != 0) {
@@ -431,9 +281,9 @@ bool connectTLS()
         return false;
     }
 
-    // Pkey
-    if (!init_pk(&pkey)) {
-        M5_LOGE("failed! init_pk");
+    // Device key (the private key stays in the ATECC608B)
+    if (!device_key::begin(unit, &pkey)) {
+        M5_LOGE("failed! device_key::begin");
         return false;
     }
 
@@ -471,7 +321,7 @@ bool connectTLS()
 
     mbedtls_ssl_conf_verify(&conf, verify_cert, nullptr);
     mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_REQUIRED);
-    mbedtls_ssl_conf_rng(&conf, mbedtls_ctr_drbg_random, &ctr_drbg);
+    device_key::configure(&conf);
 
     mbedtls_ssl_conf_ca_chain(&conf, &cacert, nullptr);
 
@@ -479,7 +329,7 @@ bool connectTLS()
         M5_LOGE("failed! mbedtls_ssl_conf_own_cert returned %d", ret);
         return false;
     }
-    mbedtls_ssl_conf_read_timeout(&conf, 5000);
+    mbedtls_ssl_conf_read_timeout(&conf, SERVER_RESPONSE_TIMEOUT_MS);
 
     if ((ret = mbedtls_ssl_setup(&ssl, &conf)) != 0) {
         M5_LOGE("failed! mbedtls_ssl_setup returned -0x%x", -ret);
@@ -502,8 +352,9 @@ bool connectTLS()
         }
     }
 
-    M5_LOGI("Handshake Protocol:%s Ciphersuite:%s Record expeansion:", mbedtls_ssl_get_version(&ssl),
+    M5_LOGI("Handshake Protocol:%s Ciphersuite:%s Record expansion:", mbedtls_ssl_get_version(&ssl),
             mbedtls_ssl_get_ciphersuite(&ssl));
+    mbedtls_ssl_conf_read_timeout(&conf, MQTT_READ_TIMEOUT_MS);
     if ((ret = mbedtls_ssl_get_record_expansion(&ssl)) >= 0) {
         M5_LOGI("Record expansion:%d", ret);
     } else {
@@ -542,11 +393,9 @@ void cleanupTLS()
 
     mbedtls_x509_crt_free(&clicert);
     mbedtls_x509_crt_free(&cacert);
-    mbedtls_pk_free(&pkey);
+    device_key::end(&pkey);
     mbedtls_ssl_free(&ssl);
     mbedtls_ssl_config_free(&conf);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
 }
 
 void mqtt_payload_handler(const char *topic, const char *payload, uint32_t plen)
@@ -576,14 +425,66 @@ void mqtt_payload_handler(const char *topic, const char *payload, uint32_t plen)
     }
 }
 
+// MQTT Remaining Length is a variable length integer (1-4 bytes)
+uint32_t encode_remaining_length(uint8_t *out, uint32_t len)
+{
+    uint32_t n{};
+    do {
+        uint8_t b = len % 128;
+        len /= 128;
+        out[n++] = b | (len ? 0x80 : 0x00);
+    } while (len && n < 4);
+    return n;
+}
+
+// Send a packet: fixed header byte, Remaining Length and body
+bool send_mqtt_packet(const uint8_t header, const uint8_t *body, const uint32_t body_len)
+{
+    uint8_t pkt[1 + 4 + 256]{};
+    if (body_len > 256) {
+        M5_LOGE("MQTT packet too long %u", body_len);
+        return false;
+    }
+    uint32_t pos = 0;
+    pkt[pos++]   = header;
+    pos += encode_remaining_length(pkt + pos, body_len);
+    memcpy(pkt + pos, body, body_len);
+    pos += body_len;
+
+    int ret = mbedtls_ssl_write(&ssl, pkt, pos);
+    if (ret <= 0) {
+        M5_LOGE("mbedtls_ssl_write failed: -0x%x", -ret);
+        return false;
+    }
+    return true;
+}
+
+// Read exactly len bytes (a packet may arrive in pieces)
+bool ssl_read_exact(uint8_t *buf, const uint32_t len)
+{
+    uint32_t got{};
+    while (got < len) {
+        int ret = mbedtls_ssl_read(&ssl, buf + got, len - got);
+        if (ret == MBEDTLS_ERR_SSL_WANT_READ) {
+            continue;
+        }
+        if (ret <= 0) {
+            M5_LOGE("mbedtls_ssl_read error: -0x%X", -ret);
+            return false;
+        }
+        got += ret;
+    }
+    return true;
+}
+
 // Read packet
 bool mqtt_cycle_read(uint8_t &out_type)
 {
     out_type = 0;
 
-    uint8_t buf[128]{};
-    int ret = mbedtls_ssl_read(&ssl, buf, sizeof(buf));
-
+    // Fixed header: packet type
+    uint8_t header{};
+    int ret = mbedtls_ssl_read(&ssl, &header, 1);
     if (ret <= 0) {
         if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_TIMEOUT) {
             // M5_LOGD("MBEDTLS_ERR_SSL_WANT_READ / MBEDTLS_ERR_SSL_TIMEOUT");
@@ -593,21 +494,57 @@ bool mqtt_cycle_read(uint8_t &out_type)
         return false;
     }
 
-    out_type = buf[0] >> 4;
+    // Fixed header: Remaining Length
+    uint32_t remaining{}, multiplier{1};
+    for (uint_fast8_t i = 0; i < 4; ++i) {
+        uint8_t b{};
+        if (!ssl_read_exact(&b, 1)) {
+            return false;
+        }
+        remaining += (b & 0x7F) * multiplier;
+        multiplier *= 128;
+        if (!(b & 0x80)) {
+            break;
+        }
+    }
+
+    // Body: keep what fits in the buffer and drop the rest
+    uint8_t buf[256]{};
+    const uint32_t kept = std::min<uint32_t>(remaining, sizeof(buf));
+    if (!ssl_read_exact(buf, kept)) {
+        return false;
+    }
+    for (uint32_t left = remaining - kept; left;) {
+        uint8_t drop[64]{};
+        const uint32_t n = std::min<uint32_t>(left, sizeof(drop));
+        if (!ssl_read_exact(drop, n)) {
+            return false;
+        }
+        left -= n;
+    }
+
+    out_type = header >> 4;
     switch (out_type) {
         case 3: {  // PUBLISH
-            uint16_t topic_len = (buf[2] << 8) | buf[3];
-            if (topic_len + 4 > ret) {
+            if (kept < 2) {
+                M5_LOGE("Invalid PUBLISH packet (too short)");
+                return false;
+            }
+            const uint16_t topic_len = (buf[0] << 8) | buf[1];
+            // Packet Identifier follows the topic when QoS > 0
+            const uint32_t offset = 2 + topic_len + (((header >> 1) & 0x03) ? 2 : 0);
+            if (offset > kept) {
                 M5_LOGE("Invalid PUBLISH packet (too short)");
                 return false;
             }
 
-            char topic[64]{};
-            memcpy(topic, &buf[4], topic_len);
+            // Truncate to the buffers (keep the terminating '\0')
+            char topic[128]{};
+            memcpy(topic, &buf[2], std::min<uint32_t>(topic_len, sizeof(topic) - 1));
 
             char payload[128]{};
-            uint16_t payload_len = ret - 4 - topic_len;
-            memcpy(payload, &buf[4 + topic_len], payload_len);
+            const uint32_t payload_len = std::min<uint32_t>(kept - offset, sizeof(payload) - 1);
+            memcpy(payload, &buf[offset], payload_len);
 
             mqtt_payload_handler(topic, payload, payload_len);
             break;
@@ -631,7 +568,7 @@ bool mqtt_cycle_read(uint8_t &out_type)
 // Waiting for receipt of specified packet type
 bool mqtt_wait_for(uint8_t expected_type, uint32_t timeout_ms)
 {
-    auto timeout_at = m5::utility::millis() + timeout_ms;
+    const auto start_at = m5::utility::millis();
     do {
         uint8_t packet_type{};
         if (!mqtt_cycle_read(packet_type)) {
@@ -640,64 +577,57 @@ bool mqtt_wait_for(uint8_t expected_type, uint32_t timeout_ms)
         if (packet_type == expected_type) {
             return true;
         }
-    } while (m5::utility::millis() <= timeout_at);
+    } while (m5::utility::elapsedSince(start_at) <= timeout_ms);
     M5_LOGE("wait_for: timeout waiting for type=%d", expected_type);
     return false;
 }
 
 bool publishMQTTMessage(const char *top_topic, const char *sub_topic, const char *message, const bool qos1 = false)
 {
-    uint8_t publish_pkt[256]{};
+    uint8_t body[256]{};
 
     // Build topic
     char full_topic[128]{};
-    strcpy(full_topic, top_topic);
-    if (sub_topic && sub_topic[0]) {
-        if (sub_topic[0] != '/') {
-            strcat(full_topic, "/");
-        }
-        strcat(full_topic, sub_topic);
+    const char *sub = sub_topic ? sub_topic : "";
+    const char *sep = (sub[0] && sub[0] != '/') ? "/" : "";
+    if (strlen(top_topic) + strlen(sep) + strlen(sub) >= sizeof(full_topic)) {
+        M5_LOGE("Topic too long");
+        return false;
     }
-    uint16_t topic_len = strlen(full_topic);
-    size_t message_len = strlen(message);
+    strcpy(full_topic, top_topic);
+    strcat(full_topic, sep);
+    strcat(full_topic, sub);
+    const uint16_t topic_len = strlen(full_topic);
+    const size_t message_len = strlen(message);
 
-    if (topic_len > 127 || message_len > 100) {
+    if (2 + topic_len + 2 + message_len > sizeof(body)) {
         M5_LOGE("Topic or payload too long");
         return false;
     }
 
-    // Fixed Header
-    publish_pkt[0] = 0x30 | (qos1 ? 0x02 : 0x00);  // Packet Type:PUBLISH| QoS bits
-    publish_pkt[1] = 0;                            // Remaining Length
-
-    uint32_t pos = 2;
+    uint32_t pos = 0;
 
     // Variable Header
-    publish_pkt[pos++] = (topic_len >> 8) & 0xFF;
-    publish_pkt[pos++] = topic_len & 0xFF;
-    memcpy(publish_pkt + pos, full_topic, topic_len);
+    body[pos++] = (topic_len >> 8) & 0xFF;
+    body[pos++] = topic_len & 0xFF;
+    memcpy(body + pos, full_topic, topic_len);
     pos += topic_len;
 
     // QoS1: Packet Identifier
     if (qos1) {
         uint16_t packet_id = get_next_packet_id();
-        publish_pkt[pos++] = (packet_id >> 8) & 0xFF;
-        publish_pkt[pos++] = packet_id & 0xFF;
+        body[pos++]        = (packet_id >> 8) & 0xFF;
+        body[pos++]        = packet_id & 0xFF;
     }
 
     // Payload
-    memcpy(publish_pkt + pos, message, message_len);
+    memcpy(body + pos, message, message_len);
     pos += message_len;
-
-    // Remaining Length
-    uint8_t remaining_len = pos - 2;
-    publish_pkt[1]        = remaining_len;
 
     M5_LOGD("Try Publish %s/%s %s (QoS=%d)", top_topic, sub_topic, message, qos1 ? 1 : 0);
 
-    int ret = mbedtls_ssl_write(&ssl, publish_pkt, pos);
-    if (ret <= 0) {
-        M5_LOGE("mbedtls_ssl_write failed: -0x%x", -ret);
+    // Packet Type: PUBLISH | QoS bits
+    if (!send_mqtt_packet(0x30 | (qos1 ? 0x02 : 0x00), body, pos)) {
         return false;
     }
 
@@ -708,10 +638,14 @@ bool publishMQTTMessage(const char *top_topic, const char *sub_topic, const char
 
 bool connectMQTT(const char *client_id)
 {
-    uint8_t connect_pkt[128]{0x10, 0x00};  // Packet Type: CONNECT, Remaining Length
+    uint8_t connect_pkt[128]{};
     const uint32_t client_id_len = strlen(client_id);
+    if (12 + client_id_len > sizeof(connect_pkt)) {
+        M5_LOGE("Client ID too long");
+        return false;
+    }
 
-    uint32_t pos = 2;
+    uint32_t pos = 0;
 
     // Protocol Name "MQTT"
     connect_pkt[pos++] = 0x00;
@@ -737,19 +671,15 @@ bool connectMQTT(const char *client_id)
     memcpy(connect_pkt + pos, client_id, client_id_len);
     pos += client_id_len;
 
-    // Fixed Header: Remaining Length
-    connect_pkt[1] = pos - 2;
-
     M5_LOGD("Try MQTT CONNECT [%s]", client_id);
 
-    int ret = mbedtls_ssl_write(&ssl, connect_pkt, pos);
-    if (ret <= 0) {
-        M5_LOGE("mbedtls_ssl_write CONNECT failed: -0x%x", -ret);
+    // Packet Type: CONNECT
+    if (!send_mqtt_packet(0x10, connect_pkt, pos)) {
         return false;
     }
 
     // Wait receive CONNACK
-    return mqtt_wait_for(2 /* CONNACK */, 2000);
+    return mqtt_wait_for(2 /* CONNACK */, SERVER_RESPONSE_TIMEOUT_MS);
 }
 
 bool subscribeMQTT(const char *topic)
@@ -757,11 +687,12 @@ bool subscribeMQTT(const char *topic)
     uint16_t packet_id = get_next_packet_id();
     uint16_t topic_len = strlen(topic);
     uint8_t subscribe_pkt[128]{};
+    if (2 + 2 + topic_len + 1 > sizeof(subscribe_pkt)) {
+        M5_LOGE("Topic too long");
+        return false;
+    }
 
     uint32_t pos         = 0;
-    subscribe_pkt[pos++] = 0x82;                   // Packet Type: SUBSCRIBE + QoS1
-    subscribe_pkt[pos++] = 2 + 2 + topic_len + 1;  // Remaining Length
-
     subscribe_pkt[pos++] = (packet_id >> 8) & 0xFF;
     subscribe_pkt[pos++] = packet_id & 0xFF;
 
@@ -773,22 +704,20 @@ bool subscribeMQTT(const char *topic)
 
     M5_LOGD("Try MQTT SUBSCRIBE [%s]", topic);
 
-    int ret = mbedtls_ssl_write(&ssl, subscribe_pkt, pos);
-    if (ret <= 0) {
-        M5_LOGE("mbedtls_ssl_write failed: -0x%x", -ret);
+    // Packet Type: SUBSCRIBE (reserved bits 0b0010)
+    if (!send_mqtt_packet(0x82, subscribe_pkt, pos)) {
         return false;
     }
 
     // Wait receive SUBACK
-    return mqtt_wait_for(9 /* SUBACK */, 2000);
+    return mqtt_wait_for(9 /* SUBACK */, SERVER_RESPONSE_TIMEOUT_MS);
 }
 
 bool yieldMQTT(uint32_t timeout_ms)
 {
-    auto start      = m5::utility::millis();
-    auto timeout_at = start + timeout_ms;
+    const auto start = m5::utility::millis();
 
-    static decltype(start) pingresp_timeout_at{}, ping_at{};
+    static m5::utility::elapsed_time_t ping_at{};
 
     constexpr uint32_t keepAliveMs = 10000;
 
@@ -802,21 +731,20 @@ bool yieldMQTT(uint32_t timeout_ms)
         }
 
         // Check PINGRESP timeout
-        if (waiting_pingresp && now > pingresp_timeout_at) {
+        if (waiting_pingresp && m5::utility::elapsedSince(ping_at, now) > keepAliveMs) {
             M5_LOGE("PINGRESP timeout");
             waiting_pingresp = false;
             return false;
         }
 
         // Send PINGREQ if needed
-        if (!waiting_pingresp && now - ping_at >= keepAliveMs) {
+        if (!waiting_pingresp && m5::utility::elapsedSince(ping_at, now) >= keepAliveMs) {
             uint8_t pingreq[] = {0xC0, 0x00};
             int ret           = mbedtls_ssl_write(&ssl, pingreq, sizeof(pingreq));
             if (ret > 0) {
                 M5_LOGD("PINGREQ sent");
-                ping_at             = now;
-                waiting_pingresp    = true;
-                pingresp_timeout_at = now + keepAliveMs;
+                ping_at          = now;
+                waiting_pingresp = true;
             } else {
                 M5_LOGE("PINGREQ write failed: -0x%X", -ret);
                 return false;
@@ -824,12 +752,32 @@ bool yieldMQTT(uint32_t timeout_ms)
         }
 
         m5::utility::delay(1);
-    } while (m5::utility::millis() <= timeout_at);
+    } while (m5::utility::elapsedSince(start) <= timeout_ms);
 
     return true;
 }
 
 }  // namespace
+
+// TLS, MQTT CONNECT and SUBSCRIBE
+bool connectAWS(const char *client_id, const char *subscribe_topic)
+{
+    waiting_pingresp = false;
+    if (!connectTLS()) {
+        M5_LOGE("connectTLS failed!");
+        return false;
+    }
+    M5_LOGI("TLS Connected");
+    if (!connectMQTT(client_id)) {
+        M5_LOGE("MQTT CONNECT failed!");
+        return false;
+    }
+    if (!subscribeMQTT(subscribe_topic)) {
+        M5_LOGE("MQTT SUBSCRIBE failed!");
+        return false;
+    }
+    return true;
+}
 
 void setup()
 {
@@ -842,58 +790,21 @@ void setup()
 
     lcd.fillScreen(TFT_DARKGRAY);
 
-    auto board = M5.getBoard();
-
-    bool unit_ready{};
 #if defined(USING_M5CORE2_AWS_BUILTIN)
-#pragma message "Using builtin ATECC608BTNGTLS"
-    // Core2 AWS: Use M5.In_I2C for built-in ATECC608B
-    if (board == m5::board_t::board_M5StackCore2) {
-        M5_LOGI("Using M5.In_I2C");
-        unit_ready = Units.add(unit, M5.In_I2C) && Units.begin();
-    } else {
+#pragma message("Using builtin ATECC608BTNGTLS")
+    // Core2 AWS: the built-in ATECC608B is on the internal bus (M5.In_I2C)
+    if (M5.getBoard() != m5::board_t::board_M5StackCore2) {
         M5_LOGE("Only Core2AWS");
-        lcd.fillScreen(TFT_RED);
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
+    const bool unit_ready = Units.add(unit, M5.In_I2C) && Units.begin();
 #else
-    // NessoN1: Arduino Wire (I2C_NUM_0) cannot be used for GROVE port.
-    //   Wire is used by M5Unified In_I2C for internal devices (IOExpander etc.).
-    //   Wire1 exists but is reserved for HatPort — cannot be used for GROVE.
-    //   Reconfiguring Wire to GROVE pins breaks In_I2C, causing ESP_ERR_INVALID_STATE in M5.update().
-    //   Solution: Use SoftwareI2C via M5HAL (bit-banging) for the GROVE port.
-    // NanoC6: Wire.begin() on GROVE pins conflicts with m5::I2C_Class registered by Ex_I2C.setPort()
-    //   on the same I2C_NUM_0, causing sporadic NACK errors.
-    //   Solution: Use M5.Ex_I2C (m5::I2C_Class) directly instead of Arduino Wire.
-    if (board == m5::board_t::board_ArduinoNessoN1) {
-        // NessoN1: GROVE is on port_b (GPIO 5/4), not port_a (which maps to Wire pins 8/10)
-        auto pin_num_sda = M5.getPin(m5::pin_name_t::port_b_out);
-        auto pin_num_scl = M5.getPin(m5::pin_name_t::port_b_in);
-        M5_LOGI("getPin(M5HAL): SDA:%u SCL:%u", pin_num_sda, pin_num_scl);
-        m5::hal::bus::I2CBusConfig i2c_cfg;
-        i2c_cfg.pin_sda = m5::hal::gpio::getPin(pin_num_sda);
-        i2c_cfg.pin_scl = m5::hal::gpio::getPin(pin_num_scl);
-        auto i2c_bus    = m5::hal::bus::i2c::getBus(i2c_cfg);
-        M5_LOGI("Bus:%d", i2c_bus.has_value());
-        unit_ready = Units.add(unit, i2c_bus ? i2c_bus.value() : nullptr) && Units.begin();
-    } else if (board == m5::board_t::board_M5NanoC6) {
-        // NanoC6: Use M5.Ex_I2C (m5::I2C_Class, not Arduino Wire)
-        M5_LOGI("Using M5.Ex_I2C");
-        unit_ready = Units.add(unit, M5.Ex_I2C) && Units.begin();
-    } else {
-        auto pin_num_sda = M5.getPin(m5::pin_name_t::port_a_sda);
-        auto pin_num_scl = M5.getPin(m5::pin_name_t::port_a_scl);
-        M5_LOGI("getPin: SDA:%u SCL:%u", pin_num_sda, pin_num_scl);
-        Wire.end();
-        Wire.begin(pin_num_sda, pin_num_scl, 400 * 1000U);
-        unit_ready = Units.add(unit, Wire) && Units.begin();
-    }
+    // Board-aware connection: NessoN1 -> SoftwareI2C on GROVE, NanoC6/NanoH2 -> M5.Ex_I2C, others -> Wire
+    const bool unit_ready = m5::unit::wiring::addI2C(Units, unit) && Units.begin();
 #endif
-
     if (!unit_ready) {
         M5_LOGE("Failed to begin");
-        lcd.fillScreen(TFT_RED);
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
 
     M5_LOGI("M5UnitUnified initialized");
@@ -901,10 +812,10 @@ void setup()
     M5_LOGI("ESP-IDF Version %d.%d.%d", (ESP_IDF_VERSION >> 16) & 0xFF, (ESP_IDF_VERSION >> 8) & 0xFF,
             ESP_IDF_VERSION & 0xFF);
 
-    // Read sn string form unit
+    // Read sn string from unit
     if (!unit.readSerialNumber(mqtt_topic)) {
         M5_LOGE("readSerialNumber failed");
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
     // Display information for provisioning
     if (!mqtt_uri || !mqtt_uri[0]) {
@@ -914,36 +825,31 @@ void setup()
     }
 
     // WiFi
-    M5_LOGI("Free heap before WiFi: %u / min: %u", ESP.getFreeHeap(), ESP.getMinFreeHeap());
-    if (!connectWiFi()) {
+    M5_LOGI("Free heap before WiFi: %u / min: %u", (unsigned)esp_get_free_heap_size(),
+            (unsigned)esp_get_minimum_free_heap_size());
+    if (!wifi_connect::begin(ssid, password)) {
         M5_LOGE("connectWiFi failed!");
-        lcd.fillScreen(TFT_RED);
-        while (true) m5::utility::delay(10000);
+        m5::unit::wiring::failStop();
     }
     M5.Log.printf("WiFi connected!\n");
 
     snprintf(mqtt_port_str, sizeof(mqtt_port_str), "%u", mqtt_port);
 
-    // TLS
-    if (!connectTLS()) {
-        M5_LOGE("connectTLS failed!");
-        lcd.fillScreen(TFT_RED);
-        while (true) m5::utility::delay(10000);
-    }
-    M5_LOGI("TLS Connected");
-
-    // MQTT
+    // TLS and MQTT
     char subscribe_topic[256]{};
     snprintf(subscribe_topic, sizeof(subscribe_topic), "%s/#", mqtt_topic);
 
-    if (!connectMQTT(mqtt_topic)) {
-        M5_LOGE("MQTT CONNECT failed!");
-        while (true) m5::utility::delay(10000);
-    }
-
-    if (!subscribeMQTT(subscribe_topic)) {
-        M5_LOGE("MQTT SUBSCRIBE failed!");
-        while (true) m5::utility::delay(10000);
+    uint32_t attempt{1};
+    while (!connectAWS(mqtt_topic, subscribe_topic)) {
+        cleanupTLS();
+        if (attempt >= CONNECT_ATTEMPTS) {
+            M5_LOGE("Failed to connect to AWS IoT");
+            m5::unit::wiring::failStop();
+        }
+        M5_LOGW("Retry connecting to AWS IoT (%u/%u)", static_cast<unsigned>(attempt + 1),
+                static_cast<unsigned>(CONNECT_ATTEMPTS));
+        m5::utility::delay(CONNECT_RETRY_INTERVAL_MS);
+        ++attempt;
     }
 
     M5.Log.printf(
@@ -960,8 +866,6 @@ void loop()
 {
     M5.update();
 
-    M5.update();
-
     if (!yieldMQTT(100)) {
         cleanupTLS();
         M5_LOGE("err");
@@ -973,7 +877,7 @@ void loop()
     auto now = m5::utility::millis();
     static decltype(now) publish_at{};
 
-    if (now > publish_at + 3000) {
+    if (m5::utility::elapsedSince(publish_at, now) > 3000) {
         if (publishMQTTMessage(mqtt_topic, "hello", "Hello from M5 QOS0")) {
             M5.Log.printf("publish(QOS0)\n");
         }
@@ -983,3 +887,34 @@ void loop()
         publish_at = now;
     }
 }
+
+#if !defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_timer.h>
+
+#if CONFIG_FREERTOS_UNICORE
+static inline void feedIdleTaskPeriodically(void)
+{
+    constexpr uint32_t FEED_INTERVAL_MS{2000};
+    constexpr TickType_t FEED_SLEEP_TICKS{pdMS_TO_TICKS(5)};
+    static uint32_t s_last_feed_ms{};
+    const uint32_t now_ms{static_cast<uint32_t>(esp_timer_get_time() / 1000)};
+    if (now_ms - s_last_feed_ms >= FEED_INTERVAL_MS) {
+        s_last_feed_ms = now_ms;
+        vTaskDelay(FEED_SLEEP_TICKS);
+    }
+}
+#endif
+
+extern "C" void app_main(void)
+{
+    setup();
+    for (;;) {
+#if CONFIG_FREERTOS_UNICORE
+        feedIdleTaskPeriodically();
+#endif
+        loop();
+    }
+}
+#endif

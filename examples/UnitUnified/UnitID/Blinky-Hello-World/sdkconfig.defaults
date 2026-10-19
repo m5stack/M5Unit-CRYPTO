@@ -1,0 +1,5 @@
+# Blinky-Hello-World specific settings (added after examples/UnitUnified/common/sdkconfig.defaults)
+# ESP-IDF 6.1+: sign the TLS handshake with the ATECC608B through the PSA secure element driver
+CONFIG_MBEDTLS_SECURE_ELEMENT_DRIVER_ENABLED=y
+# Wi-Fi + TLS do not fit the default 1 MB app partition on ESP-IDF 6.x
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y

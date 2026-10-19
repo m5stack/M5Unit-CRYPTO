@@ -40,10 +40,9 @@ The unit's device certificate and serial number appear on the serial monitor.
 13:58:46.310 > -----END CERTIFICATE-----
 13:58:46.313 > *** AWS endpoint is empty ***
 ```
-``
 
 #### Make device certificate file
-Make device_cert.crt at project directory
+Make device_cert.crt in this example directory
 
 ```pem
 -----BEGIN CERTIFICATE-----
@@ -63,10 +62,11 @@ aXxnZYgX4Jm7UJRL2irQBDO5fQ==
 ```
 
 #### Run AWS IoT setting script
+Run the script in [scripts](scripts) from this example directory
 
 ```bash
 # Usage
-aws_register_thing.sh device_certificate serialnumber region
+./scripts/aws_register_thing.sh device_certificate serialnumber region
 ```
 
 |Argument|Description|
@@ -76,26 +76,23 @@ aws_register_thing.sh device_certificate serialnumber region
 | region            | AWS IoT Region|
 
 
-example:
+The script needs the [AWS CLI](https://aws.amazon.com/cli/) (configured with your credentials) and OpenSSL.
+It creates or reuses the policy, the thing type, the Thing and the certificate, so it can be run again.
+
+example (first run in the region):
 ```log
 ./scripts/aws_register_thing.sh device_cert.crt 0123456789ABCDEF01 us-east-1
 [1/6] Validating inputs...
 Device certificate valid.
 Region "us-east-1" is valid.
 [2/6] Creating or confirming policy "M5Unit-ID-Policy"...
-Policy exists.
-[3/6] Deleting and recreating thing "0123456789ABCDEF01"...
-Thing deleted.
-{
-    "thingName": "0123456789ABCDEF01",
-    "thingArn": "arn:aws:iot:us-east-1:467176691427:thing/0123456789ABCDEF01",
-    "thingId": "70c23967-9c9e-4096-81d6-a4204e2374fb"
-}
+Policy created.
+[3/6] Creating or confirming thing "0123456789ABCDEF01"...
+Creating thing type "m5unit-id"...
 Thing "0123456789ABCDEF01" created.
 [4/6] Checking or registering certificate...
-Looking for matching certificate in current region...
-Found matching certificate: arn:aws:iot:us-east-1:467176691427:cert/7eba90338ba67d4633fbc14e01a37b6050eeae32e1abe00244a6c43b76ff45cd
-Reusing existing certificate.
+Registering new certificate...
+Certificate: arn:aws:iot:us-east-1:123456789012:cert/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 [5/6] Attaching certificate to thing...
 [6/6] Attaching policy...
 DONE. Thing "0123456789ABCDEF01" is ready and bound to certificate.
@@ -104,6 +101,12 @@ AWS IoT Endpoint
     "endpointAddress": "exampleexample-ats.iot.region.amazonaws.com"
 }
 ```
+
+#### Amazon Root CA
+The example embeds Amazon Root CA 1 (`root_ca_der[]` in main/Blinky-Hello-World.cpp), so you do not need to download it.
+[scripts/download_aws_root.sh](scripts/download_aws_root.sh) downloads it and saves it as DER (`./data/AmazonRootCA1.der`)
+if you want to check or replace the embedded certificate.
+
 ### 3. Build settings
 
 #### ArduinoIDE
@@ -137,13 +140,28 @@ Edit Blinky-Hello-World.ino
 Edit ini file
 
 ```ini
-[env:UnitID_Blinky-Hello-wWorld_Core2_Arduino_latest]
+[env:UnitID_Blinky-Hello-World_Core_Arduino_latest]
 .
 .
 build_flags = ${option_release.build_flags}
   -DEXAMPLE_SSID="\"YOUR_SSID\""
   -DEXAMPLE_PASSWORD="\"PASSWORD\""
   -DEXAMPLE_MQTT_URI="\"exampleexample-ats.iot.region.amazonaws.com\""
+```
+
+#### ESP-IDF
+ESP-IDF 5.x (>= 5.1) or 6.1 and later, on a Wi-Fi capable chip (esp32 / esp32s3 / esp32c3 / esp32c5 / esp32c6).  
+ESP-IDF 6.0 is not supported: its mbedtls 4 has no PSA secure element driver, which signs the TLS handshake with the ATECC608B on 6.1.  
+Tab5 (ESP32-P4) has no on-die radio; its Wi-Fi runs on the ESP32-C6 co-processor over SDIO and needs ESP-IDF >= 5.3 (esp_wifi_remote + esp_hosted, pulled in automatically; the SDIO preset is in sdkconfig.defaults.esp32p4).  
+Set the Wi-Fi and AWS IoT settings in menuconfig.
+
+```sh
+cd examples/UnitUnified/UnitID/Blinky-Hello-World
+idf.py set-target esp32
+idf.py menuconfig
+# -> M5Unit-CRYPTO example -> Target unit -> UnitID or Core2 for AWS built-in ATECC608B (esp32 only)
+# -> Blinky-Hello-World settings -> Wi-Fi SSID / Wi-Fi password / AWS IoT endpoint / AWS IoT port
+idf.py build flash monitor
 ```
 
 ### 4. Upload & Monitor

@@ -51,49 +51,47 @@ enum class Source : uint8_t {
     AlternateKeyBuffer,  //!< Alternate Key Buffer
     ExternalBuffer,      //!< Any buffer
 };
-/*!
-  @enum Destination
-  @brief Data destination
- */
+//! @brief Data destination (same values as Source)
 using Destination = Source;
 
 ///@name Zone
 ///@{
-constexpr uint8_t ZONE_CONFIG{0x00};
-constexpr uint8_t ZONE_OTP{0x01};
-constexpr uint8_t ZONE_DATA{0x02};
+constexpr uint8_t ZONE_CONFIG{0x00};  //!< Configuration zone
+constexpr uint8_t ZONE_OTP{0x01};     //!< One time programmable zone
+constexpr uint8_t ZONE_DATA{0x02};    //!< Data zone
 ///@}
 
 /*!
   @enum Error
- @brief Error status
+  @brief Error status
 */
 enum Error : uint8_t {
-    CHECK_MAC_OR_VERIFY_ERROR  = 0x01,
-    PARSE_ERROR                = 0x03,
-    ECC_FAULT                  = 0x05,
-    SELF_TEST_ERROR            = 0x07,
-    HEALTH_TEST_ERROR          = 0x08,
-    EXECUTION_ERROR            = 0x0F,
-    AFTER_WAKE_PRIOR_ERROR     = 0X11,
-    WATCH_DOG_ERROR            = 0xEE,
-    CRC_OR_COMMUNICATION_ERROR = 0XFF,
+    CHECK_MAC_OR_VERIFY_ERROR  = 0x01,  //!< CheckMac or Verify miscompare
+    PARSE_ERROR                = 0x03,  //!< Illegal parameter or command
+    ECC_FAULT                  = 0x05,  //!< ECC processing fault
+    SELF_TEST_ERROR            = 0x07,  //!< Self test failure
+    HEALTH_TEST_ERROR          = 0x08,  //!< Random number generator health test failure
+    EXECUTION_ERROR            = 0x0F,  //!< Command could not be executed
+    AFTER_WAKE_PRIOR_ERROR     = 0x11,  //!< After wake, prior to first command
+    WATCH_DOG_ERROR            = 0xEE,  //!< Watchdog is about to expire
+    CRC_OR_COMMUNICATION_ERROR = 0xFF,  //!< CRC or communication error
 };
 
 ///@cond
 ///@name Delay time between send and receive
+///@brief Maximum execution time of the ATECC608 (ms)
 ///@{
-constexpr uint32_t DELAY_READ{3};
+constexpr uint32_t DELAY_READ{5};
 constexpr uint32_t DELAY_WRITE{45};
-constexpr uint32_t DELAY_INFO{2};
-constexpr uint32_t DELAY_NONCE{16};
-constexpr uint32_t DELAY_SELFTEST{200};
+constexpr uint32_t DELAY_INFO{5};
+constexpr uint32_t DELAY_NONCE{20};
+constexpr uint32_t DELAY_SELFTEST{250};
 constexpr uint32_t DELAY_RANDOM{23};
-constexpr uint32_t DELAY_COUNTER{20};
+constexpr uint32_t DELAY_COUNTER{25};
 constexpr uint32_t DELAY_GENKEY{115};
-constexpr uint32_t DELAY_SIGN{70};
-constexpr uint32_t DELAY_SHA{9};
-constexpr uint32_t DELAY_ECDH{58};
+constexpr uint32_t DELAY_SIGN{115};
+constexpr uint32_t DELAY_SHA{36};
+constexpr uint32_t DELAY_ECDH{75};
 constexpr uint32_t DELAY_VERIFY{120};
 ///@}
 
@@ -213,7 +211,7 @@ inline uint16_t offset_to_param2_for_config(const uint8_t offset)
 //! @brief Conversion slot and block to address for Data zone
 inline uint16_t slot_block_to_param2(const uint8_t slot, const uint16_t offset)
 {
-    const uint8_t block       = offset >> 5;         // 0〜2
+    const uint8_t block       = offset >> 5;         // 0〜12
     const uint8_t word_offset = (offset & 31) >> 2;  // 0〜7
     return (slot << 3) | (block << 8) | word_offset;
 }
@@ -235,21 +233,48 @@ extern const uint32_t template_for_device_size;
 extern const uint32_t template_for_signer_size;
 ///@endcond
 
+///@name Certificate size
+///@{
+/*!
+  The DER signature at the end of a certificate is at most 75 bytes long (each INTEGER gets a leading 0x00 when its MSB
+  is 1),
+  so a certificate can be longer than its template. Give an output buffer of at least these sizes
+*/
+constexpr uint16_t MAX_DEVICE_CERTIFICATE_SIZE{548};  //!< Device certificate (template 546 + 2)
+constexpr uint16_t MAX_SIGNER_CERTIFICATE_SIZE{521};  //!< Signer certificate (template 520 + 1)
+///@}
+
+///@cond
+/*!
+  @brief Put the DER encoded signature at the end of a certificate built from a template
+  @param[in,out] out Certificate that holds a copy of the template
+  @param[in,out] olen In: buffer length / Out: certificate length
+  @param template_size Size of the template
+  @param offset_signature Offset of the signature (BIT STRING) in the template
+  @param raw_sig Raw signature (R and S, 32 bytes each)
+  @return True if successful
+*/
+bool insert_certificate_signature(uint8_t* out, uint16_t& olen, const uint32_t template_size,
+                                  const uint16_t offset_signature, const uint8_t raw_sig[64]);
+///@endcond
+
 /*!
   @class m5::unit::atecc608::CompCertAccessor
   @brief Compressed certificate accessor
  */
 class CompCertAccessor {
 public:
+    //! @brief Date and time (same members as struct tm)
     struct DateTime {
-        int tm_sec;   // 0 to 59
-        int tm_min;   // 0 to 59
-        int tm_hour;  // 0 to 23
-        int tm_mday;  // 1 to 31
-        int tm_mon;   // 0 to 11
-        int tm_year;  // years since 1900
+        int tm_sec;   //!< 0 to 59
+        int tm_min;   //!< 0 to 59
+        int tm_hour;  //!< 0 to 23
+        int tm_mday;  //!< 1 to 31
+        int tm_mon;   //!< 0 to 11
+        int tm_year;  //!< years since 1900
     };
 
+    //! @brief Constructor (data: 72-byte compressed certificate)
     explicit CompCertAccessor(const uint8_t* data) : _data(data)
     {
         if (_data) {
@@ -258,45 +283,55 @@ public:
         }
     }
 
+    //! @brief Format version
     inline uint8_t format_version() const
     {
         return _data[70] & 0x0F;
     }
+    //! @brief Template ID
     inline uint8_t template_id() const
     {
         return (_data[69] >> 4) & 0x0F;
     }
+    //! @brief Chain ID
     inline uint8_t chain_id() const
     {
         return _data[69] & 0x0F;
     }
+    //! @brief Serial number source
     inline uint8_t sn_source() const
     {
         return (_data[70] >> 4) & 0x0F;
     }
 
+    //! @brief Signer ID (2 bytes)
     inline const uint8_t* signer_id() const
     {
         return _data + 67;
     }
 
+    //! @brief Signature (R and S, 64 bytes)
     inline const uint8_t* signature() const
     {
         return _data + 0;
     }
+    //! @brief Signature R (32 bytes)
     inline const uint8_t* signature_r() const
     {
         return _data + 0;
     }
+    //! @brief Signature S (32 bytes)
     inline const uint8_t* signature_s() const
     {
         return _data + 32;
     }
 
+    //! @brief Issue date
     inline DateTime issue_date() const
     {
         return _issue_date;
     }
+    //! @brief Expire date (9999-12-31 23:59:59 if it does not expire)
     inline DateTime expire_date() const
     {
         return _expire_date;
@@ -360,59 +395,4 @@ private:
 }  // namespace atecc608
 }  // namespace unit
 }  // namespace m5
-#endif
-
-#if 0
-7:01:52.557 > [   899][E][unit_ATECC608B.cpp:1186] receive_response(): CRC error: C76B != FFFF (count:35 max_read:35)
-17:01:52.563 > DUMP:0x3ffb2080 35 bytes
-17:01:52.572 > 0x3ffb2080| 23 8F 0F 8F 8F 0F 0F 8F 0F 0F 8F 0F 8F 0F 8F 8F |#...............
-17:01:52.578 > 0x3ffb2090| 8F 8F 8F 9F FF FF FF FF FF FF FF FF FF FF FF FF |................
-17:01:52.583 > 0x3ffb20a0| FF FF FF                                        |...
-17:01:52.589 > [   923][E][PlotToSerial.cpp:237] setup(): readConfigZone NG
-17:01:52.590 > [   936][E][unit_ATECC608B.cpp:1210] read_data(): Failed send_command:01 0002
-17:01:52.596 > [   941][E][PlotToSerial.cpp:242] setup(): readOTPZone NG
-17:01:52.607 > [   941][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
-17:01:52.620 > [   962][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 1 err:-5 resp:00,00,00,00
-17:01:52.631 > [   972][E][unit_ATECC608B.cpp:1186] receive_response(): CRC error: 2C9E != FFFF (count:35 max_read:35)
-17:01:52.637 > DUMP:0x3ffb1ed0 35 bytes
-17:01:52.646 > 0x3ffb1ed0| 23 07 31 00 64 FE AF 6E A0 7A 2F F5 96 55 AA 6B |#.1.d..n.z/..U.k
-17:01:52.652 > 0x3ffb1ee0| 11 AF 44 A3 1E DF DD 2E 57 E3 96 F0 FF FF FF FF |..D.....W.......
-17:01:52.657 > 0x3ffb1ef0| FF FF FF                                        |...
-17:01:52.663 > [   997][E][PlotToSerial.cpp:247] setup(): readDataZone NG
-17:01:52.671 > [  1013][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.677 > [  1018][E][PlotToSerial.cpp:253] setup(): readKeyValid[1] NG
-17:01:52.682 > [  1022][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.688 > [  1027][E][PlotToSerial.cpp:253] setup(): readKeyValid[2] NG
-17:01:52.693 > [  1040][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
-17:01:52.705 > [  1048][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.710 > [  1053][E][PlotToSerial.cpp:253] setup(): readKeyValid[4] NG
-17:01:52.716 > [  1057][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.727 > [  1062][E][PlotToSerial.cpp:253] setup(): readKeyValid[5] NG
-17:01:52.732 > [  1071][E][unit_ATECC608B.cpp:1186] receive_response(): CRC error: 0F0E != FFFF (count:7 max_read:7)
-17:01:52.738 > DUMP:0x3ffb1f30 7 bytes
-17:01:52.747 > 0x3ffb1f30| 07 00 00 0F FF FF FF                            |.......
-17:01:52.753 > [  1086][E][PlotToSerial.cpp:253] setup(): readKeyValid[6] NG
-17:01:52.760 > [  1104][E][PlotToSerial.cpp:253] setup(): readKeyValid[8] NG
-17:01:52.765 > [  1104][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
-17:01:52.771 > [  1113][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.776 > [  1118][E][PlotToSerial.cpp:253] setup(): readKeyValid[9] NG
-17:01:52.787 > [  1129][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
-17:01:52.793 > [  1138][E][PlotToSerial.cpp:253] setup(): readKeyValid[11] NG
-17:01:52.798 > [  1138][W][unit_ATECC608B.cpp:596] wakeup_i2c_class(): Wakeup retry 0 err:-5 resp:00,00,00,00
-17:01:52.810 > [  1150][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.815 > [  1155][E][PlotToSerial.cpp:253] setup(): readKeyValid[12] NG
-17:01:52.821 > [  1162][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.832 > [  1167][E][PlotToSerial.cpp:253] setup(): readKeyValid[13] NG
-17:01:52.837 > [  1176][E][unit_ATECC608B.cpp:1186] receive_response(): CRC error: 2552 != 0000 (count:31 max_read:7)
-17:01:52.843 > DUMP:0x3ffb1f30 7 bytes
-17:01:52.852 > 0x3ffb1f30| 1F FF FF FF FF FF FF                            |.......
-17:01:52.858 > [  1191][E][PlotToSerial.cpp:253] setup(): readKeyValid[14] NG
-17:01:52.866 > [  1208][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.872 > [  1213][E][PlotToSerial.cpp:259] setup(): readCounter(0) NG
-17:01:52.877 > [  1218][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.883 > [  1223][E][PlotToSerial.cpp:262] setup(): readCounter(1) NG
-17:01:52.888 > [  1230][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:52.900 > [  1235][E][PlotToSerial.cpp:267] setup(): readDeviceState NG
-17:01:53.099 > [  1441][E][unit_ATECC608B.cpp:1173] receive_response(): Failed to read response
-17:01:53.105 > [  1446][E][PlotToSerial.cpp:272] setup(): selfTest NG
 #endif

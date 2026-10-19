@@ -81,6 +81,8 @@ constexpr uint8_t template_for_signer[] = {
 
 constexpr uint32_t template_for_device_size{sizeof(template_for_device)};
 constexpr uint32_t template_for_signer_size{sizeof(template_for_signer)};
+static_assert(template_for_device_size + 2 == MAX_DEVICE_CERTIFICATE_SIZE, "Invalid MAX_DEVICE_CERTIFICATE_SIZE");
+static_assert(template_for_signer_size + 1 == MAX_SIGNER_CERTIFICATE_SIZE, "Invalid MAX_SIGNER_CERTIFICATE_SIZE");
 
 bool convertToPEM(char* out, const uint32_t olen, const uint8_t* der, uint32_t dlen, const char* header,
                   const char* footer)

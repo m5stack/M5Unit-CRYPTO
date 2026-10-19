@@ -11,8 +11,8 @@
 // ****************************************************************************************************
 // Fill in the following define or specify with build option
 // ****************************************************************************************************
-// Enable this define when using M5Core2AWS's built-in chip
 #if !defined(USING_M5CORE2_AWS_BUILTIN)
+// For Core2 for AWS built-in ATECC608B (K010-AWS)
 // #define USING_M5CORE2_AWS_BUILTIN
 #endif
 

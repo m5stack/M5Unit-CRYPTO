@@ -19,11 +19,11 @@ Core2 for AWS is a dedicated kit for AWS IoT learning projects. It consists of t
 
 
 ## Related Link
-See also examples using conventional methods here.
 
 - [Unit ID & Datasheet](https://docs.m5stack.com/en/unit/id)
+- [Core2 for AWS](https://docs.m5stack.com/en/products/sku/K010-AWS)
 
-### Required Libraries:
+### Required Libraries
 - [M5UnitUnified](https://github.com/m5stack/M5UnitUnified)
 - [M5Utility](https://github.com/m5stack/M5Utility)
 - [M5HAL](https://github.com/m5stack/M5HAL)
@@ -54,6 +54,31 @@ you must enable the define symbol below.
 #endif
 ```
 
+### For ESP-IDF settings
+PlotToSerial and ViaPaHub can be built with ESP-IDF 5.1 or later (5.x and 6.x).
+Blinky-Hello-World can be built with ESP-IDF 5.x (>= 5.1) or 6.1 and later (6.0 is not supported); see [its README](examples/UnitUnified/UnitID/Blinky-Hello-World) for the settings.
+To use the built-in ATECC608B on **M5Stack Core2 for AWS (SKU:K010-AWS)** in PlotToSerial, choose it in menuconfig.
+The choice is passed to the source as `USING_M5CORE2_AWS_BUILTIN` by `examples/UnitUnified/common/variant.cmake`, so the source does not need to be edited.
+
+```sh
+cd examples/UnitUnified/UnitID/PlotToSerial
+idf.py set-target esp32
+idf.py menuconfig
+# -> M5Unit-CRYPTO example -> Target unit -> choose ONE:
+#      UnitID (U124, ATECC608B-TNGTLS / GROVE)
+#      Core2 for AWS built-in ATECC608B (K010-AWS)   (esp32 only)
+idf.py build flash monitor
+```
+
+ViaPaHub has no variant; run `idf.py set-target <chip>` and `idf.py build flash monitor`.
+
+## Support via [PaHub](https://docs.m5stack.com/en/unit/Unit-PaHub%20v2.1)
+
+|Unit|Support|Note|
+|---|---|---|
+|UnitID|OK||
+
+See also the [ViaPaHub](examples/UnitUnified/UnitID/ViaPaHub) example and [M5Unit-HUB](https://github.com/m5stack/M5Unit-HUB)
 
 ## Doxygen document
 [GitHub Pages](https://m5stack.github.io/M5Unit-CRYPTO/)
@@ -69,6 +94,5 @@ If you want to output Git commit hashes to html, do it for the git cloned folder
 
 ### Required
 - [Doxygen](https://www.doxygen.nl/)
-- [pcregrep](https://formulae.brew.sh/formula/pcre2)
 - [Git](https://git-scm.com/) (Output commit hash to html)
 

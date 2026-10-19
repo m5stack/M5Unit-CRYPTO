@@ -13,7 +13,6 @@
 using namespace m5::utility::mmh3;
 using namespace m5::unit::types;
 using namespace m5::unit::atecc608;
-using m5::unit::types::elapsed_time_t;
 
 namespace {
 constexpr uint8_t otp_608b_tngtls[64] = {0x78, 0x36, 0x74, 0x6A, 0x75, 0x5A, 0x4D, 0x79,  //
@@ -232,6 +231,47 @@ bool encode_signature_der(const uint8_t* raw_sig, uint8_t* der_sig, uint32_t& de
 
 namespace m5 {
 namespace unit {
+namespace atecc608 {
+
+bool insert_certificate_signature(uint8_t* out, uint16_t& olen, const uint32_t template_size,
+                                  const uint16_t offset_signature, const uint8_t raw_sig[64])
+{
+    if (!out || !raw_sig || offset_signature >= template_size) {
+        return false;
+    }
+
+    // Signature DER encode
+    uint8_t der_sig[80]{};
+    uint32_t der_sig_size{sizeof(der_sig)};
+    if (!encode_signature_der(raw_sig, der_sig, der_sig_size)) {
+        M5_LIB_LOGE("DER signature encode failed");
+        return false;
+    }
+    if (offset_signature + der_sig_size > olen) {
+        M5_LIB_LOGE("Buffer too small %u > %u", offset_signature + der_sig_size, olen);
+        return false;
+    }
+    memcpy(out + offset_signature, der_sig, der_sig_size);
+
+    // The signature may be longer or shorter than the one in the template
+    const int32_t delta = static_cast<int32_t>(der_sig_size) - static_cast<int32_t>(template_size - offset_signature);
+    if (delta) {
+        // Outer SEQUENCE length (0x30 0x82 HH LL)
+        uint32_t len = m5::types::big_uint16_t(out[2], out[3]).get();
+        len += delta;
+        if (len < 128 || len > 65535) {
+            M5_LIB_LOGE("Failed to adjust %u", len);
+            return false;
+        }
+        out[2] = len >> 8;
+        out[3] = len & 0xFF;
+    }
+    olen = static_cast<uint16_t>(template_size + delta);
+    return true;
+}
+
+}  // namespace atecc608
+
 // class UnitATECC608B_TNGTLS
 const char UnitATECC608B_TNGTLS::name[] = "UnitATECC608B_TNGTLS";
 const types::uid_t UnitATECC608B_TNGTLS::uid{"UnitATECC608B_TNGTLS"_mmh3};
@@ -244,9 +284,7 @@ bool UnitATECC608B_TNGTLS::readRandomArray(uint8_t data[32], const bool /*update
 
 bool UnitATECC608B_TNGTLS::begin_impl()
 {
-    const uint8_t* rev = revision();
-    if (!(rev[0] == 0x00 && rev[1] == 0x00 && rev[2] == 0x60 && rev[3] >= 0x03)) {
-        M5_LIB_LOGE("This is not 608B %02X:%02X:%02X:%02X", rev[0], rev[1], rev[2], rev[3]);
+    if (!UnitATECC608B::begin_impl()) {
         return false;
     }
     // Device is awake from begin()'s single wakeup session — read OTP directly.
@@ -285,7 +323,7 @@ bool UnitATECC608B_TNGTLS::readDeviceCertificate(uint8_t* out, uint16_t& olen, c
     constexpr uint16_t offset_auth_key_id{441};
     constexpr uint16_t offset_signature{473};
 
-    if (!out || olen == 0 || olen < template_for_device_size) {
+    if (!out || olen < MAX_DEVICE_CERTIFICATE_SIZE) {
         M5_LIB_LOGE("Argument error");
         return false;
     }
@@ -326,31 +364,9 @@ bool UnitATECC608B_TNGTLS::readDeviceCertificate(uint8_t* out, uint16_t& olen, c
         return false;
     }
 
-    // Signature DER encode
-    uint8_t der_sig[80]{};
-    uint32_t der_sig_size{sizeof(der_sig)};
-    if (!encode_signature_der(cca.signature(), der_sig, der_sig_size)) {
-        M5_LIB_LOGE("DER signature encode failed");
+    // Signature
+    if (!insert_certificate_signature(out, olen, template_for_device_size, offset_signature, cca.signature())) {
         return false;
-    }
-    if (offset_signature + der_sig_size > olen) {
-        M5_LIB_LOGE("Buffer too small");
-        return false;
-    }
-    memcpy(out + offset_signature, der_sig, der_sig_size);
-
-    uint32_t cur_deg_size = template_for_device_size - offset_signature;
-    int delta             = (int)der_sig_size - (int)cur_deg_size;
-    olen                  = template_for_device_size + delta;
-    if (delta) {                              // Adjust length
-        uint32_t len = out[2] << 8 | out[3];  // BE
-        len += delta;
-        if (len < 128 || len > 65535) {
-            M5_LIB_LOGE("Failed to adjust %u", len);
-            return false;
-        }
-        out[2] = len >> 8;
-        out[3] = len & 0xFF;
     }
 
     // Issue/Expire data
@@ -428,7 +444,7 @@ bool UnitATECC608B_TNGTLS::readSignerCertificate(uint8_t* out, uint16_t& olen)
     //    constexpr uint16_t offset_auth_key_id{414};
     constexpr uint16_t offset_signature{446};
 
-    if (!out || olen == 0 || olen < template_for_signer_size) {
+    if (!out || olen < MAX_SIGNER_CERTIFICATE_SIZE) {
         M5_LIB_LOGE("Argument error");
         return false;
     }
@@ -461,22 +477,9 @@ bool UnitATECC608B_TNGTLS::readSignerCertificate(uint8_t* out, uint16_t& olen)
         return false;
     }
 
-    // Signature DER encode
-    uint8_t der_sig[80]{};
-    uint32_t der_sig_size{sizeof(der_sig)};
-    if (!encode_signature_der(cca.signature(), der_sig, der_sig_size)) {
-        M5_LIB_LOGE("DER signature encode failed");
+    // Signature
+    if (!insert_certificate_signature(out, olen, template_for_signer_size, offset_signature, cca.signature())) {
         return false;
-    }
-    memcpy(out + offset_signature, der_sig, der_sig_size);
-
-    int delta = (int)der_sig_size - (int)(template_for_signer_size - offset_signature);
-    olen      = template_for_signer_size + delta;
-    if (delta) {  // Adjust length
-        uint32_t len = out[2] << 8 | out[3];
-        len += delta;
-        out[2] = len >> 8;
-        out[3] = len & 0xFF;
     }
 
     // Issue/Expire date

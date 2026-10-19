@@ -50,57 +50,36 @@ else
     { \"Effect\": \"Allow\", \"Action\": [\"iot:UpdateThingShadow\", \"iot:GetThingShadow\"],
       \"Resource\": [
         \"arn:aws:iot:$REGION:$ACCOUNT_ID:topic/\$aws/things/\${iot:Connection.Thing.ThingName}/shadow/*\"] }
-  ]}"
+  ]}" > /dev/null
   echo "Policy created."
 fi
 
-echo "[3/6] Deleting and recreating thing \"$THING_NAME\"..."
-if aws iot describe-thing --thing-name "$THING_NAME" --region "$REGION" > /dev/null 2>&1; then
-  PRINCIPALS=$(aws iot list-thing-principals --thing-name "$THING_NAME" --region "$REGION" --query "principals[]" --output text)
-  for p in $PRINCIPALS; do
-    aws iot detach-thing-principal --thing-name "$THING_NAME" --principal "$p" --region "$REGION"
-  done
-  aws iot delete-thing --thing-name "$THING_NAME" --region "$REGION"
-  echo "Thing deleted."
-fi
-
-THING_TYPE_ARN=$(aws iot list-thing-types --region "$REGION" \
-  --query "thingTypes[?thingTypeName=='$THING_TYPE'].thingTypeArn" --output text)
-
-if [ -z "$THING_TYPE_ARN" ]; then
+echo "[3/6] Creating or confirming thing \"$THING_NAME\"..."
+THING_TYPE_DEPRECATED=$(aws iot list-thing-types --region "$REGION" --thing-type-name "$THING_TYPE" \
+  --query "thingTypes[0].thingTypeMetadata.deprecated" --output text)
+if [ "$THING_TYPE_DEPRECATED" = "None" ] || [ -z "$THING_TYPE_DEPRECATED" ]; then
   echo "Creating thing type \"$THING_TYPE\"..."
-  THING_TYPE_ARN=$(aws iot create-thing-type --thing-type-name "$THING_TYPE" --region "$REGION" --query "thingTypeArn" --output text)
+  aws iot create-thing-type --thing-type-name "$THING_TYPE" --region "$REGION" > /dev/null
+elif [ "$THING_TYPE_DEPRECATED" = "True" ]; then
+  echo "ERROR: thing type \"$THING_TYPE\" is deprecated. Undeprecate it (aws iot deprecate-thing-type --undo-deprecate) or delete it"
+  exit 1
 fi
 
-aws iot create-thing --thing-name "$THING_NAME" \
-  --thing-type-name "$THING_TYPE" \
-  --region "$REGION"
-echo "Thing \"$THING_NAME\" created."
+if aws iot describe-thing --thing-name "$THING_NAME" --region "$REGION" > /dev/null 2>&1; then
+  echo "Thing exists."
+else
+  aws iot create-thing --thing-name "$THING_NAME" --thing-type-name "$THING_TYPE" --region "$REGION" > /dev/null
+  echo "Thing \"$THING_NAME\" created."
+fi
 
 echo "[4/6] Checking or registering certificate..."
 
-# DER-based SHA1 of device_cert
-CERT_SHA1=$(openssl x509 -in "$DEVICE_CERT" -outform DER | shasum -a 1 | cut -d' ' -f1)
+# The AWS IoT certificate ID is the SHA-256 of the DER encoded certificate
+CERT_ID=$(openssl x509 -in "$DEVICE_CERT" -outform DER | shasum -a 256 | cut -d' ' -f1)
 
-echo "Looking for matching certificate in current region..."
-CERT_ARN=""
-for CERT_ID in $(aws iot list-certificates --region "$REGION" --query "certificates[].certificateId" --output text); do
-  TMP_CERT=$(mktemp)
-  aws iot describe-certificate --certificate-id "$CERT_ID" --region "$REGION" \
-    --query "certificateDescription.certificatePem" --output text > "$TMP_CERT"
-
-  SHA1=$(openssl x509 -in "$TMP_CERT" -outform DER | shasum -a 1| cut -d' ' -f1)
-  rm "$TMP_CERT"
-
-  if [ "$SHA1" = "$CERT_SHA1" ]; then
-    CERT_ARN=$(aws iot describe-certificate --certificate-id "$CERT_ID" --region "$REGION" \
-      --query "certificateDescription.certificateArn" --output text)
-    echo "Found matching certificate: $CERT_ARN"
-    break
-  fi
-done
-
-if [ -z "$CERT_ARN" ]; then
+CERT_STATUS=$(aws iot describe-certificate --certificate-id "$CERT_ID" --region "$REGION" \
+  --query "certificateDescription.status" --output text 2> /dev/null || true)
+if [ -z "$CERT_STATUS" ]; then
   echo "Registering new certificate..."
   CERT_ARN=$(aws iot register-certificate-without-ca \
     --certificate-pem file://"$DEVICE_CERT" \
@@ -108,15 +87,28 @@ if [ -z "$CERT_ARN" ]; then
     --region "$REGION" \
     --query certificateArn --output text)
 else
-  echo "Reusing existing certificate."
+  echo "Found the certificate (status: $CERT_STATUS)."
+  case "$CERT_STATUS" in
+    ACTIVE) ;;
+    INACTIVE)
+      echo "Activating the certificate..."
+      aws iot update-certificate --certificate-id "$CERT_ID" --new-status ACTIVE --region "$REGION"
+      ;;
+    *)
+      echo "ERROR: the certificate is $CERT_STATUS and cannot be used"
+      exit 1
+      ;;
+  esac
+  CERT_ARN=$(aws iot describe-certificate --certificate-id "$CERT_ID" --region "$REGION" \
+    --query "certificateDescription.certificateArn" --output text)
 fi
-
+echo "Certificate: $CERT_ARN"
 
 echo "[5/6] Attaching certificate to thing..."
-aws iot attach-thing-principal --thing-name "$THING_NAME" --principal "$CERT_ARN" --region "$REGION" || echo "Already attached."
+aws iot attach-thing-principal --thing-name "$THING_NAME" --principal "$CERT_ARN" --region "$REGION"
 
 echo "[6/6] Attaching policy..."
-aws iot attach-policy --policy-name "$POLICY_NAME" --target "$CERT_ARN" --region "$REGION" || echo "Policy already attached."
+aws iot attach-policy --policy-name "$POLICY_NAME" --target "$CERT_ARN" --region "$REGION"
 
 echo "DONE. Thing \"$THING_NAME\" is ready and bound to certificate."
 echo "AWS IoT Endpoint"

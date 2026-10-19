@@ -1,0 +1,2 @@
+# The "Target unit" choice is shared by the UnitID examples.
+rsource "../../../common/Kconfig.variant"

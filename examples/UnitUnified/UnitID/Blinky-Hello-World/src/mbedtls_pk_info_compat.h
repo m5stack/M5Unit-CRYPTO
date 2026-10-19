@@ -3,21 +3,29 @@
  *
  * SPDX-License-Identifier: MIT
  */
+/*
+  mbedtls_pk_info_t for mbedtls 2.x / 3.x, used to replace sign_func of the ECKEY pk with the ATECC608B.
+
+  mbedtls 3.x has no public header for mbedtls_pk_info_t, so Variant B / C below are copies of the private
+  struct in mbedtls library/pk_wrap.h. A copy that does not match the library breaks silently (memcpy of
+  the wrong size, wrong function slots), so the variant is chosen by MBEDTLS_VERSION_NUMBER and other
+  versions stop with #error. Compare the copy with library/pk_wrap.h when adding a version.
+  - Variant C was checked against mbedtls 3.6.3 / 3.6.5 / 3.6.6 (ESP-IDF 5.0.9 - 5.5.4, Arduino core 3.x)
+  - mbedtls 4.x does not use this file (PSA secure element driver, see device_key.hpp)
+*/
 #ifndef MBEDTLS_PK_INFO_COMPAT_H
 #define MBEDTLS_PK_INFO_COMPAT_H
 
+#include <mbedtls/version.h>
 #include <mbedtls/pk.h>
 
-#if __has_include(<esp_idf_version.h>)
-#include <esp_idf_version.h>
-#else
-#define ESP_IDF_VERSION_VAL(major, minor, patch) ((major << 16) | (minor << 8) | (patch))
-#define ESP_IDF_VERSION                          ESP_IDF_VERSION_VAL(3, 2, 0)
+#if MBEDTLS_VERSION_NUMBER >= 0x03070000
+#error "mbedtls_pk_info_t is not checked for this mbedtls version (compare with library/pk_wrap.h)"
 #endif
 
-#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
 // ============================================================
-// Variant A: ESP-IDF 4.x (mbedtls 2.x)
+// Variant A: mbedtls 2.x (Arduino core 2.x / ESP-IDF 4.x)
 //   mbedtls_pk_info_t is public via pk_internal.h
 //   sign_func: (void *ctx, ..., sig, sig_len, f_rng, p_rng)
 // ============================================================
@@ -28,9 +36,9 @@
 
 using custom_sign_ctx_t = void *;
 
-#elif ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 2, 0)
+#elif MBEDTLS_VERSION_NUMBER < 0x03050000
 // ============================================================
-// Variant B: ESP-IDF 5.0/5.1 (mbedtls 3.2-3.4)
+// Variant B: mbedtls 3.0 - 3.4 (early ESP-IDF 5.0 / 5.1 releases)
 //   pk_internal.h removed; struct is opaque
 //   sign_func: (void *ctx, ..., sig, sig_size, sig_len, f_rng, p_rng)
 //   check_pair_func: added f_rng, p_rng
@@ -71,7 +79,7 @@ using custom_sign_ctx_t = void *;
 
 #else
 // ============================================================
-// Variant C: ESP-IDF 5.2+ (mbedtls 3.5+)
+// Variant C: mbedtls 3.5 - 3.6 (ESP-IDF 5.0.9 / 5.1.7 and later, Arduino core 3.x)
 //   All function pointers changed from void* to mbedtls_pk_context*
 // ============================================================
 struct mbedtls_pk_info_t {
